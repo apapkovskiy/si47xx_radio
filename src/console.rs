@@ -9,6 +9,30 @@ struct SerialPort<'a>(&'a Mutex<RefCell<Option<uarte::UarteTx<'a>>>>);
 static WRITER_MUTEX: Mutex<RefCell<Option<uarte::UarteTx<'static>>>> = Mutex::new(RefCell::new(None));
 static WRITER_OUT: SerialPort = SerialPort(&WRITER_MUTEX);
 
+pub mod console_colors {
+    #![allow(dead_code)]
+    use core::fmt::Arguments;
+    pub const RESET: Arguments = format_args!("\x1B[0m");
+    pub const EMPTY: Arguments = format_args!("");
+    pub const BLACK: Arguments = format_args!("\x1B[0;30m");
+    pub const RED: Arguments = format_args!("\x1B[0;31m");
+    pub const GREEN: Arguments = format_args!("\x1B[0;32m");
+    pub const YELLOW: Arguments = format_args!("\x1B[0;33m");
+    pub const BLUE: Arguments = format_args!("\x1B[0;34m");
+    pub const MAGENTA: Arguments = format_args!("\x1B[0;35m");
+    pub const CYAN: Arguments = format_args!("\x1B[0;36m");
+    pub const WHITE: Arguments = format_args!("\x1B[0;37m");
+    pub const BOLD: Arguments = format_args!("\x1B[1m");
+    pub const BOLD_BLACK: Arguments = format_args!("\x1B[1;30m");
+    pub const BOLD_RED: Arguments = format_args!("\x1B[1;31m");
+    pub const BOLD_GREEN: Arguments = format_args!("\x1B[1;32m");
+    pub const BOLD_YELLOW: Arguments = format_args!("\x1B[1;33m");
+    pub const BOLD_BLUE: Arguments = format_args!("\x1B[1;34m");
+    pub const BOLD_MAGENTA: Arguments = format_args!("\x1B[1;35m");
+    pub const BOLD_CYAN: Arguments = format_args!("\x1B[1;36m");
+    pub const BOLD_WHITE: Arguments = format_args!("\x1B[1;37m");
+}
+
 pub fn stdout_get() -> StdOut {
     StdOut
 }
