@@ -1,10 +1,15 @@
-use core::fmt::Write;
-
+use crate::console;
+use crate::events;
+use crate::events::SystemEvent;
+use crate::events::SystemNotify;
+use core::cell::Cell;
+use core::fmt::{Debug, Write};
+use core::marker::PhantomData;
 use embassy_nrf::uarte;
 use embedded_cli::cli::CliBuilder;
 use embedded_cli::{Command, codes};
-use crate::events;
-use crate::console;
+use embassy_futures::select::{select, Either};
+
 
 pub const DEL: u8 = 127; // Delete character
 
@@ -15,7 +20,7 @@ enum BaseCommand {
         command: RadioMode,
     },
     Volume {
-       #[command(subcommand)]
+        #[command(subcommand)]
         command: VolumeCommand,
     },
     Tune {
@@ -62,26 +67,114 @@ enum VolumeCommand {
     },
 }
 
+struct PromtStatus<'d> {
+    frequency: f32,
+    mode: RadioMode,
+    promt: Cell<heapless::String<64>>,
+    _p: PhantomData<&'d ()>,
+}
+
+impl<'d> PromtStatus<'d> {
+    pub const fn new() -> Self {
+        Self {
+            frequency: 0.0,
+            mode: RadioMode::FM,
+            promt: Cell::new(heapless::String::new()),
+            _p: PhantomData {},
+        }
+    }
+
+    fn get_prompt(&self) -> &'d str {
+        unsafe {
+            let ptr = self.promt.as_ptr();
+            let str = &*ptr;
+            str.as_str()
+        }
+    }
+
+    pub fn into_prompt(&mut self) -> &'d str {
+        use crate::console::console_colors::*;
+        self.promt.get_mut().clear();
+        let _ = write!(
+            self.promt.get_mut(),
+            "{BOLD_GREEN}radio-cli {BOLD_BLUE}{:?} {BOLD_YELLOW}{:.1} MHz{BOLD_GREEN})>{RESET} ",
+            self.mode,
+            self.frequency,
+        );
+        self.get_prompt()
+    }
+
+    pub fn set_mode(&mut self, mode: RadioMode) -> &mut Self {
+        self.mode = mode;
+        self
+    }
+    pub fn set_frequency(&mut self, frequency: f32) -> &mut Self {
+        self.frequency = frequency;
+        self
+    }
+}
+
+fn cli_handle_notificytion(writer: &mut dyn Write, event: SystemNotify, prompt_status: &mut PromtStatus) {
+    match event {
+        SystemNotify::RadioAmOn => {
+            prompt_status.set_mode(RadioMode::AM);
+            write!(writer, "Switched to AM mode").ok();
+        }
+        SystemNotify::RadioFmOn => {
+            prompt_status.set_mode(RadioMode::FM);
+            write!(writer, "Switched to FM mode").ok();
+        }
+        SystemNotify::RadioOff => {
+            prompt_status.set_mode(RadioMode::Off);
+            write!(writer, "Radio powered off").ok();
+        }
+        SystemNotify::TuneStatus(tune_status) => {
+            prompt_status.set_frequency(tune_status.frequency);
+            write!(writer, "Tuned to frequency {} MHz, {:?}", tune_status.frequency, tune_status).ok();
+        }
+        _ => {write!(writer, "Notification: {:?}", event).ok();}
+    }
+}
+
 #[embassy_executor::task]
 pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
-
     let (command_buffer, history_buffer) = unsafe {
         static mut COMMAND_BUFFER: [u8; 40] = [0; 40];
         static mut HISTORY_BUFFER: [u8; 41] = [0; 41];
         #[allow(static_mut_refs)]
         (COMMAND_BUFFER.as_mut(), HISTORY_BUFFER.as_mut())
     };
+    let mut prompt_status: PromtStatus = PromtStatus::new();
     let mut cli = CliBuilder::default()
         .writer(console::stdout_get())
         .command_buffer(command_buffer)
         .history_buffer(history_buffer)
+        .prompt(prompt_status.into_prompt())
         .build()
-        .ok().unwrap();
+        .ok()
+        .unwrap();
+
+    let mut notification_subscriber = events::notify_subscriber().unwrap();
 
     loop {
         let buffer = &mut [0u8; 1];
-        rx.read(buffer).await.unwrap();
-        if buffer[0] == DEL { // Currently CLI does not handle DEL
+        
+        loop {
+            let char = rx.read(buffer);
+            match select(char, notification_subscriber.next_message_pure()).await {
+                Either::First(_) => break,
+                Either::Second(event) => {
+                    cli.write(|writer| {
+                        cli_handle_notificytion(writer, event, &mut prompt_status);
+                        Ok(())
+                    }).ok();
+                    cli.set_prompt(prompt_status.into_prompt()).ok();
+                }
+            }
+        }
+        
+        if buffer[0] == DEL {
+            // Currently CLI does not handle DEL
             buffer[0] = codes::BACKSPACE; // To overcome map DEL to BACKSPACE
         }
 
@@ -93,59 +186,55 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
             buffer[0],
             &mut BaseCommand::processor(|cli, command| match command {
                 BaseCommand::Status => {
-                    let _ = cli.writer().write_str("System status: All systems operational");
+                    let _ = cli
+                        .writer()
+                        .write_str("System status: All systems operational");
                     Ok(())
-                },
+                }
                 BaseCommand::Mode { command } => {
                     match command {
-                        RadioMode::FM => {
-                            let _ = cli.writer().write_str("Switched to FM mode");
-                            events::event_try_send(events::SystemEvent::RadioFmOn);
-                        },
-                        RadioMode::AM => {
-                            let _ = cli.writer().write_str("Switched to AM mode");
-                            events::event_try_send(events::SystemEvent::RadioAmOn);
-                        },
-                        RadioMode::Off => {
-                            let _ = cli.writer().write_str("Radio powered off");
-                            events::event_try_send(events::SystemEvent::RadioOff);
-                        },
+                        RadioMode::FM => events::event_try_send(SystemEvent::RadioFmOn),
+                        RadioMode::AM => events::event_try_send(SystemEvent::RadioAmOn),
+                        RadioMode::Off => events::event_try_send(SystemEvent::RadioOff),
                     }
                     Ok(())
-                },
+                }
                 BaseCommand::Volume { command } => {
                     match command {
                         VolumeCommand::Up => {
                             let _ = cli.writer().write_str("Volume increased");
-                            events::event_try_send(events::SystemEvent::RadioVolumeUp);
-                        },
+                            events::event_try_send(SystemEvent::RadioVolumeUp);
+                        }
                         VolumeCommand::Down => {
                             let _ = cli.writer().write_str("Volume decreased");
-                            events::event_try_send(events::SystemEvent::RadioVolumeDown);
-                        },
+                            events::event_try_send(SystemEvent::RadioVolumeDown);
+                        }
                         VolumeCommand::Set { level } => {
-                            let _ = cli.writer().write_fmt(format_args!("Volume set to {}", level));
-                            events::event_try_send(events::SystemEvent::RadioVolumeSet(level));
-                        },
+                            let _ = cli
+                                .writer()
+                                .write_fmt(format_args!("Volume set to {}", level));
+                            events::event_try_send(SystemEvent::RadioVolumeSet(level));
+                        }
                     }
                     Ok(())
-                },
+                }
                 BaseCommand::Tune { command } => {
                     match command {
                         TuneCommand::Up => {
                             let _ = cli.writer().write_str("Tuning up");
-                            events::event_try_send(events::SystemEvent::RadioSeekUp);
-                        },
+                            events::event_try_send(SystemEvent::RadioSeekUp);
+                        }
                         TuneCommand::Down => {
                             let _ = cli.writer().write_str("Tuning down not supported");
-                        },
+                        }
                         TuneCommand::Frequency { frequency } => {
-                            let _ = cli.writer().write_fmt(format_args!("Frequency set to {} MHz", frequency));
-                            events::event_try_send(events::SystemEvent::RadioSetFrequency(frequency));
-                        },
+                            events::event_try_send(SystemEvent::RadioSetFrequency(
+                                frequency,
+                            ));
+                        }
                     }
                     Ok(())
-                },
+                }
             }),
         );
     }
