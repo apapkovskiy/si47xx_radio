@@ -67,26 +67,26 @@ enum VolumeCommand {
     },
 }
 
-struct PromtStatus<'d> {
+struct PromptStatus<'d> {
     frequency: f32,
     mode: RadioMode,
-    promt: Cell<heapless::String<64>>,
+    prompt: Cell<heapless::String<64>>,
     _p: PhantomData<&'d ()>,
 }
 
-impl<'d> PromtStatus<'d> {
+impl<'d> PromptStatus<'d> {
     pub const fn new() -> Self {
         Self {
             frequency: 0.0,
             mode: RadioMode::FM,
-            promt: Cell::new(heapless::String::new()),
+            prompt: Cell::new(heapless::String::new()),
             _p: PhantomData {},
         }
     }
 
     fn get_prompt(&self) -> &'d str {
         unsafe {
-            let ptr = self.promt.as_ptr();
+            let ptr = self.prompt.as_ptr();
             let str = &*ptr;
             str.as_str()
         }
@@ -94,9 +94,9 @@ impl<'d> PromtStatus<'d> {
 
     pub fn into_prompt(&mut self) -> &'d str {
         use crate::console::console_colors::*;
-        self.promt.get_mut().clear();
+        self.prompt.get_mut().clear();
         let _ = write!(
-            self.promt.get_mut(),
+            self.prompt.get_mut(),
             "{BOLD_GREEN}radio-cli {BOLD_BLUE}{:?} {BOLD_YELLOW}{:.1} MHz{BOLD_GREEN})>{RESET} ",
             self.mode,
             self.frequency,
@@ -114,7 +114,7 @@ impl<'d> PromtStatus<'d> {
     }
 }
 
-fn cli_handle_notificytion(writer: &mut dyn Write, event: SystemNotify, prompt_status: &mut PromtStatus) {
+fn cli_handle_notification(writer: &mut dyn Write, event: SystemNotify, prompt_status: &mut PromptStatus) {
     match event {
         SystemNotify::RadioAmOn => {
             prompt_status.set_mode(RadioMode::AM);
@@ -144,7 +144,7 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
         #[allow(static_mut_refs)]
         (COMMAND_BUFFER.as_mut(), HISTORY_BUFFER.as_mut())
     };
-    let mut prompt_status: PromtStatus = PromtStatus::new();
+    let mut prompt_status: PromptStatus = PromptStatus::new();
     let mut cli = CliBuilder::default()
         .writer(console::stdout_get())
         .command_buffer(command_buffer)
@@ -165,7 +165,7 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
                 Either::First(_) => break,
                 Either::Second(event) => {
                     cli.write(|writer| {
-                        cli_handle_notificytion(writer, event, &mut prompt_status);
+                        cli_handle_notification(writer, event, &mut prompt_status);
                         Ok(())
                     }).ok();
                     cli.set_prompt(prompt_status.into_prompt()).ok();

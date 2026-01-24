@@ -10,13 +10,13 @@ impl SerialLogger {
     pub const fn new() -> Self {
         Self
     }
-    pub const fn get_level_color(level: Level) -> &'static core::fmt::Arguments<'static> {
+    pub const fn get_level_color(level: Level) -> core::fmt::Arguments<'static> {
         match level {
-            Level::Error => &RED,
-            Level::Warn => &YELLOW,
-            Level::Info => &WHITE,
-            Level::Debug => &WHITE,
-            Level::Trace => &WHITE,
+            Level::Error => RED,
+            Level::Warn => YELLOW,
+            Level::Info => WHITE,
+            Level::Debug => WHITE,
+            Level::Trace => WHITE,
         }
     }
 }

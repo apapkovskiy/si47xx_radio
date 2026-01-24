@@ -48,7 +48,7 @@ async fn main(spawner: Spawner) {
     let revision = radio_dev.revision_get().await.expect("Failed to get revision");
     radio_dev.sound_on().await.expect("Failed to unmute sound");
 
-    let _ =spawner.spawn(cli::my_task(rx));
+    let _ = spawner.spawn(cli::my_task(rx));
     yield_now().await;
 
     let mut radio = radio_dev.fm().await.expect("Failed to switch to FM mode");
