@@ -1,3 +1,11 @@
+//! Lightweight `log` backend that writes colorized messages over the serial console.
+//!
+//! The logger:
+//! - emits millisecond timestamps from `embassy_time::Instant`,
+//! - colorizes levels with the escape sequences from `console::console_colors`,
+//! - caps verbosity at `Level::Info` (debug/trace are ignored),
+//! - writes through the shared UART writer provided by `console::stdout_get()`.
+
 use log::{Record, Level, Metadata, SetLoggerError, LevelFilter};
 use core::fmt::Write as _;
 use embassy_time::Instant;
@@ -10,6 +18,7 @@ impl SerialLogger {
     pub const fn new() -> Self {
         Self
     }
+    /// Map a `Level` to its ANSI color escape for pretty printing.
     pub const fn get_level_color(level: Level) -> core::fmt::Arguments<'static> {
         match level {
             Level::Error => RED,
@@ -38,6 +47,7 @@ impl log::Log for SerialLogger {
 
 static LOGGER: SerialLogger = SerialLogger::new();
 
+/// Install the serial logger and set the max level to `Info`.
 pub fn init() -> Result<(), SetLoggerError> {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(LevelFilter::Info))
