@@ -17,7 +17,8 @@ use embassy_nrf::uarte;
 /// `Write`-compatible API.
 struct SerialPort<'a>(&'a Mutex<RefCell<Option<uarte::UarteTx<'a>>>>);
 
-static WRITER_MUTEX: Mutex<RefCell<Option<uarte::UarteTx<'static>>>> = Mutex::new(RefCell::new(None));
+static WRITER_MUTEX: Mutex<RefCell<Option<uarte::UarteTx<'static>>>> =
+    Mutex::new(RefCell::new(None));
 static WRITER_OUT: SerialPort = SerialPort(&WRITER_MUTEX);
 
 pub mod console_colors {
@@ -77,7 +78,7 @@ impl<'a> SerialPort<'a> {
                 let _ = tx.blocking_write(buf);
             }
             Ok(buf.len())
-       })
+        })
     }
 }
 
