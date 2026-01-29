@@ -5,11 +5,10 @@ use crate::events::SystemNotify;
 use core::cell::Cell;
 use core::fmt::{Debug, Write};
 use core::marker::PhantomData;
+use embassy_futures::select::{Either, select};
 use embassy_nrf::uarte;
 use embedded_cli::cli::CliBuilder;
 use embedded_cli::{Command, codes};
-use embassy_futures::select::{select, Either};
-
 
 pub const DEL: u8 = 127; // Delete character
 
@@ -84,7 +83,7 @@ impl<'d> PromptStatus<'d> {
         }
     }
 
-    fn get_prompt(&self) -> &'d str {
+    fn get_prompt_str(&self) -> &'d str {
         unsafe {
             let ptr = self.prompt.as_ptr();
             let str = &*ptr;
@@ -92,7 +91,7 @@ impl<'d> PromptStatus<'d> {
         }
     }
 
-    pub fn into_prompt(&mut self) -> &'d str {
+    pub fn get_prompt(&mut self) -> &'d str {
         use crate::console::console_colors::*;
         self.prompt.get_mut().clear();
         let _ = write!(
@@ -101,7 +100,7 @@ impl<'d> PromptStatus<'d> {
             self.mode,
             self.frequency,
         );
-        self.get_prompt()
+        self.get_prompt_str()
     }
 
     pub fn set_mode(&mut self, mode: RadioMode) -> &mut Self {
@@ -114,7 +113,11 @@ impl<'d> PromptStatus<'d> {
     }
 }
 
-fn cli_handle_notification(writer: &mut dyn Write, event: SystemNotify, prompt_status: &mut PromptStatus) {
+fn cli_handle_notification(
+    writer: &mut dyn Write,
+    event: SystemNotify,
+    prompt_status: &mut PromptStatus,
+) {
     match event {
         SystemNotify::RadioAmOn => {
             prompt_status.set_mode(RadioMode::AM);
@@ -130,9 +133,16 @@ fn cli_handle_notification(writer: &mut dyn Write, event: SystemNotify, prompt_s
         }
         SystemNotify::TuneStatus(tune_status) => {
             prompt_status.set_frequency(tune_status.frequency);
-            write!(writer, "Tuned to frequency {} MHz, {:?}", tune_status.frequency, tune_status).ok();
+            write!(
+                writer,
+                "Tuned to frequency {} MHz, {:?}",
+                tune_status.frequency, tune_status
+            )
+            .ok();
         }
-        _ => {write!(writer, "Notification: {:?}", event).ok();}
+        _ => {
+            write!(writer, "Notification: {:?}", event).ok();
+        }
     }
 }
 
@@ -149,7 +159,7 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
         .writer(console::stdout_get())
         .command_buffer(command_buffer)
         .history_buffer(history_buffer)
-        .prompt(prompt_status.into_prompt())
+        .prompt(prompt_status.get_prompt())
         .build()
         .ok()
         .unwrap();
@@ -158,7 +168,7 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
 
     loop {
         let buffer = &mut [0u8; 1];
-        
+
         loop {
             let char = rx.read(buffer);
             match select(char, notification_subscriber.next_message_pure()).await {
@@ -167,12 +177,13 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
                     cli.write(|writer| {
                         cli_handle_notification(writer, event, &mut prompt_status);
                         Ok(())
-                    }).ok();
-                    cli.set_prompt(prompt_status.into_prompt()).ok();
+                    })
+                    .ok();
+                    cli.set_prompt(prompt_status.get_prompt()).ok();
                 }
             }
         }
-        
+
         if buffer[0] == DEL {
             // Currently CLI does not handle DEL
             buffer[0] = codes::BACKSPACE; // To overcome map DEL to BACKSPACE
@@ -228,9 +239,7 @@ pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
                             let _ = cli.writer().write_str("Tuning down not supported");
                         }
                         TuneCommand::Frequency { frequency } => {
-                            events::event_try_send(SystemEvent::RadioSetFrequency(
-                                frequency,
-                            ));
+                            events::event_try_send(SystemEvent::RadioSetFrequency(frequency));
                         }
                     }
                     Ok(())

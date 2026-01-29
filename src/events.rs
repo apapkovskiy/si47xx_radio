@@ -1,4 +1,3 @@
-
 //! Event and notification system for radio control and status updates.
 //!
 //! This module defines the event and notification types used for communication between
@@ -15,9 +14,9 @@
 
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::channel::Channel;
-use embassy_sync::pubsub::{PubSubChannel, Subscriber, Publisher};
+use embassy_sync::pubsub::{PubSubChannel, Publisher, Subscriber};
 
-use si473x::{Si47xxTuneStatus, Si47xxRevision};
+use si473x::{Si47xxRevision, Si47xxTuneStatus};
 
 /// Events representing user actions or commands for the radio system.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -67,18 +66,16 @@ pub enum SystemNotify {
     VolumeChanged(u8),
 }
 
-
 /// Notification channel for broadcasting system notifications.
-static NOTIFICATION_CHANNEL: PubSubChannel<ThreadModeRawMutex, SystemNotify, 4, 4, 2> = PubSubChannel::new();
+static NOTIFICATION_CHANNEL: PubSubChannel<ThreadModeRawMutex, SystemNotify, 4, 4, 2> =
+    PubSubChannel::new();
 /// Event channel for sending system events.
 static EVENT_CHANNEL: Channel<ThreadModeRawMutex, SystemEvent, 1> = Channel::new();
-
 
 /// Asynchronously send a system event to the event channel.
 pub async fn event_send(state: SystemEvent) {
     EVENT_CHANNEL.send(state).await;
 }
-
 
 /// Try to send a system event to the event channel without blocking.
 ///
@@ -87,24 +84,23 @@ pub fn event_try_send(state: SystemEvent) {
     EVENT_CHANNEL.try_send(state).ok();
 }
 
-
 /// Asynchronously receive the next system event from the event channel.
 pub async fn event_receive() -> SystemEvent {
     EVENT_CHANNEL.receive().await
 }
 
-
 /// Create a new subscriber for system notifications.
 ///
 /// Returns a [`Subscriber`] that can receive notifications published to the notification channel.
-pub fn notify_subscriber<'a>() -> Result<Subscriber<'a, ThreadModeRawMutex, SystemNotify, 4, 4, 2>, embassy_sync::pubsub::Error> {
+pub fn notify_subscriber<'a>()
+-> Result<Subscriber<'a, ThreadModeRawMutex, SystemNotify, 4, 4, 2>, embassy_sync::pubsub::Error> {
     NOTIFICATION_CHANNEL.subscriber()
 }
-
 
 /// Create a new publisher for system notifications.
 ///
 /// Returns a [`Publisher`] that can send notifications to all subscribers.
-pub fn notify_publisher<'a>() -> Result<Publisher<'a, ThreadModeRawMutex, SystemNotify, 4, 4, 2>, embassy_sync::pubsub::Error> {
+pub fn notify_publisher<'a>()
+-> Result<Publisher<'a, ThreadModeRawMutex, SystemNotify, 4, 4, 2>, embassy_sync::pubsub::Error> {
     NOTIFICATION_CHANNEL.publisher()
 }

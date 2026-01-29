@@ -3,20 +3,20 @@
 
 use embassy_executor::Spawner;
 use embassy_futures::yield_now;
+use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_nrf::peripherals::{SERIAL0, SERIAL1};
 use embassy_nrf::{bind_interrupts, uarte};
-use embassy_nrf::gpio::{Level, Output, OutputDrive};
 use embassy_time::Timer;
 use log::{info, warn};
 use panic_probe as _;
 
-use static_cell::ConstStaticCell;
 use embassy_nrf::twim::{self, Twim};
+use static_cell::ConstStaticCell;
 
-mod serial_logger;
 mod cli;
 pub mod console;
 pub mod events;
+mod serial_logger;
 use si473x::Si47xxDevice;
 
 bind_interrupts!(struct Irqs {
@@ -28,7 +28,7 @@ bind_interrupts!(struct Irqs {
 async fn main(spawner: Spawner) {
     let p = embassy_nrf::init(Default::default());
     let mut led = Output::new(p.P0_28, Level::Low, OutputDrive::Standard);
-    
+
     let mut config = uarte::Config::default();
     config.parity = uarte::Parity::EXCLUDED;
     config.baudrate = uarte::Baudrate::BAUD115200;
@@ -45,7 +45,10 @@ async fn main(spawner: Spawner) {
     radio_dev.reset().await;
     radio_dev.init_fm().await.expect("Radio init failed");
     warn!("Radio initialized!");
-    let revision = radio_dev.revision_get().await.expect("Failed to get revision");
+    let revision = radio_dev
+        .revision_get()
+        .await
+        .expect("Failed to get revision");
     radio_dev.sound_on().await.expect("Failed to unmute sound");
 
     let _ = spawner.spawn(cli::my_task(rx));
@@ -53,12 +56,21 @@ async fn main(spawner: Spawner) {
 
     let mut radio = radio_dev.fm().await.expect("Failed to switch to FM mode");
     let notification_publisher = events::notify_publisher().unwrap();
-    notification_publisher.publish(events::SystemNotify::RadioFmOn).await;
+    notification_publisher
+        .publish(events::SystemNotify::RadioFmOn)
+        .await;
     yield_now().await;
-    notification_publisher.publish(events::SystemNotify::RevisionInfo(revision)).await;
+    notification_publisher
+        .publish(events::SystemNotify::RevisionInfo(revision))
+        .await;
     yield_now().await;
-    let tune_status = radio.tune_status_get().await.expect("Failed to get tune status");
-    notification_publisher.publish(events::SystemNotify::TuneStatus(tune_status)).await;
+    let tune_status = radio
+        .tune_status_get()
+        .await
+        .expect("Failed to get tune status");
+    notification_publisher
+        .publish(events::SystemNotify::TuneStatus(tune_status))
+        .await;
 
     loop {
         led.set_high();
@@ -70,19 +82,26 @@ async fn main(spawner: Spawner) {
         match event {
             events::SystemEvent::RadioVolumeUp => {
                 radio.volume_up().await.expect("Volume up failed");
-            },
+            }
             events::SystemEvent::RadioVolumeDown => {
                 radio.volume_down().await.expect("Volume down failed");
-            },
+            }
             events::SystemEvent::RadioSetFrequency(freq) => {
-                let tune_status = radio.tune_frequency(freq).await.expect("Set frequency failed");
-                notification_publisher.publish(events::SystemNotify::TuneStatus(tune_status)).await;
-            },
+                let tune_status = radio
+                    .tune_frequency(freq)
+                    .await
+                    .expect("Set frequency failed");
+                notification_publisher
+                    .publish(events::SystemNotify::TuneStatus(tune_status))
+                    .await;
+            }
             events::SystemEvent::RadioSeekUp => {
                 let tune_status = radio.seek_up().await.expect("Seek up failed");
                 info!("Seeked up: {:?}", tune_status);
-                notification_publisher.publish(events::SystemNotify::TuneStatus(tune_status)).await;
-            },
+                notification_publisher
+                    .publish(events::SystemNotify::TuneStatus(tune_status))
+                    .await;
+            }
             _ => {
                 info!("Event not handled in main loop");
             }
