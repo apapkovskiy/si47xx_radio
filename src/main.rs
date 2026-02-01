@@ -3,44 +3,29 @@
 
 use embassy_executor::Spawner;
 use embassy_futures::yield_now;
-use embassy_nrf::gpio::{Level, Output, OutputDrive};
-use embassy_nrf::peripherals::{SERIAL0, SERIAL1};
-use embassy_nrf::{bind_interrupts, uarte};
 use embassy_time::Timer;
 use log::{info, warn};
 use panic_probe as _;
 
-use embassy_nrf::twim::{self, Twim};
-use static_cell::ConstStaticCell;
-
+pub mod boards;
 mod cli;
 pub mod console;
+use crate::boards::hal::*;
 pub mod events;
 mod serial_logger;
 use si473x::Si47xxDevice;
 
-bind_interrupts!(struct Irqs {
-    SERIAL0 => uarte::InterruptHandler<SERIAL0>;
-    SERIAL1 => twim::InterruptHandler<SERIAL1>;
-});
-
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let p = embassy_nrf::init(Default::default());
-    let mut led = Output::new(p.P0_28, Level::Low, OutputDrive::Standard);
+    let mut led = hal_led_create();
 
-    let mut config = uarte::Config::default();
-    config.parity = uarte::Parity::EXCLUDED;
-    config.baudrate = uarte::Baudrate::BAUD115200;
-    let uart: uarte::Uarte<'static> = uarte::Uarte::new(p.SERIAL0, p.P0_22, p.P0_20, Irqs, config);
+    let uart = hal_uart_create();
     let (tx, rx) = uart.split();
     console::stdout_init(tx);
     serial_logger::init().unwrap();
 
-    let config = twim::Config::default();
-    static RAM_BUFFER: ConstStaticCell<[u8; 16]> = ConstStaticCell::new([0; 16]);
-    let twi = Twim::new(p.SERIAL1, Irqs, p.P1_14, p.P1_13, config, RAM_BUFFER.take());
-    let reset_pin = Output::new(p.P1_03, Level::High, OutputDrive::Standard);
+    let twi = hal_twi_create();
+    let reset_pin = hal_radio_reset_create();
     let mut radio_dev: Si47xxDevice<_, _> = Si47xxDevice::new(twi, reset_pin);
     radio_dev.reset().await;
     radio_dev.init_fm().await.expect("Radio init failed");
