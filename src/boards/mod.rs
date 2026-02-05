@@ -31,3 +31,11 @@ pub mod hal {
     pub mod nrf5340dk;
     pub use nrf5340dk::*;
 }
+
+#[cfg(feature = "host")]
+pub mod hal {
+    //! Hardware abstraction layer for host builds.
+    pub mod hosthal;
+    pub use embedded_hal::digital::OutputPin;
+    pub use hosthal::*;
+}

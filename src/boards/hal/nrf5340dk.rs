@@ -90,14 +90,14 @@ pub fn hal_twi_create() -> HalTwim {
 /// # Returns
 ///
 /// A configured UART instance ready for serial communication.
-pub fn hal_uart_create() -> HalUart {
+pub fn hal_uart_create() -> (HalUartTx, HalUartRx) {
     let mut config = uarte::Config::default();
     config.parity = uarte::Parity::EXCLUDED;
     config.baudrate = uarte::Baudrate::BAUD115200;
     let serial = unsafe { peripherals::SERIAL0::steal() };
     let rxd = unsafe { peripherals::P0_22::steal() };
     let txd = unsafe { peripherals::P0_20::steal() };
-    uarte::Uarte::new(serial, rxd, txd, Irqs, config)
+    uarte::Uarte::new(serial, rxd, txd, Irqs, config).split()
 }
 
 /// Creates the QSPI flash interface for persistent storage.

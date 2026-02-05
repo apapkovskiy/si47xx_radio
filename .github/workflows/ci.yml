@@ -19,7 +19,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-          targets: thumbv8m.main-none-eabihf
+          targets: thumbv8m.main-none-eabihf, x86_64-unknown-linux-gnu
 
       - name: Build
         run: cargo build
@@ -27,8 +27,11 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      - name: Clippy
-        run: cargo clippy --all-features -- -D warnings
+      - name: Clippy Arm
+        run: cargo clippy -- -D warnings
+
+      - name: Clippy Host
+        run: cargo clippy --features host --no-default-features --target x86_64-unknown-linux-gnu -- -D warnings
 
       - name: Docs
         run: cargo doc

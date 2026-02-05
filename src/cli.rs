@@ -1,3 +1,4 @@
+use crate::boards::hal::*;
 use crate::console;
 use crate::events;
 use crate::events::SystemEvent;
@@ -6,7 +7,6 @@ use core::cell::Cell;
 use core::fmt::{Debug, Write};
 use core::marker::PhantomData;
 use embassy_futures::select::{Either, select};
-use embassy_nrf::uarte;
 use embedded_cli::cli::CliBuilder;
 use embedded_cli::{Command, codes};
 
@@ -147,7 +147,7 @@ fn cli_handle_notification(
 }
 
 #[embassy_executor::task]
-pub async fn my_task(mut rx: uarte::UarteRx<'static>) {
+pub async fn my_task(mut rx: HalUartRx) {
     let (command_buffer, history_buffer) = unsafe {
         static mut COMMAND_BUFFER: [u8; 40] = [0; 40];
         static mut HISTORY_BUFFER: [u8; 41] = [0; 41];
