@@ -12,7 +12,7 @@
 //!
 //! The channels are implemented using Embassy's async synchronization primitives.
 
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_sync::pubsub::{PubSubChannel, Publisher, Subscriber};
 
@@ -67,10 +67,10 @@ pub enum SystemNotify {
 }
 
 /// Notification channel for broadcasting system notifications.
-static NOTIFICATION_CHANNEL: PubSubChannel<ThreadModeRawMutex, SystemNotify, 4, 4, 2> =
+static NOTIFICATION_CHANNEL: PubSubChannel<CriticalSectionRawMutex, SystemNotify, 4, 4, 2> =
     PubSubChannel::new();
 /// Event channel for sending system events.
-static EVENT_CHANNEL: Channel<ThreadModeRawMutex, SystemEvent, 1> = Channel::new();
+static EVENT_CHANNEL: Channel<CriticalSectionRawMutex, SystemEvent, 1> = Channel::new();
 
 /// Asynchronously send a system event to the event channel.
 pub async fn event_send(state: SystemEvent) {
@@ -92,15 +92,19 @@ pub async fn event_receive() -> SystemEvent {
 /// Create a new subscriber for system notifications.
 ///
 /// Returns a [`Subscriber`] that can receive notifications published to the notification channel.
-pub fn notify_subscriber<'a>()
--> Result<Subscriber<'a, ThreadModeRawMutex, SystemNotify, 4, 4, 2>, embassy_sync::pubsub::Error> {
+pub fn notify_subscriber<'a>() -> Result<
+    Subscriber<'a, CriticalSectionRawMutex, SystemNotify, 4, 4, 2>,
+    embassy_sync::pubsub::Error,
+> {
     NOTIFICATION_CHANNEL.subscriber()
 }
 
 /// Create a new publisher for system notifications.
 ///
 /// Returns a [`Publisher`] that can send notifications to all subscribers.
-pub fn notify_publisher<'a>()
--> Result<Publisher<'a, ThreadModeRawMutex, SystemNotify, 4, 4, 2>, embassy_sync::pubsub::Error> {
+pub fn notify_publisher<'a>() -> Result<
+    Publisher<'a, CriticalSectionRawMutex, SystemNotify, 4, 4, 2>,
+    embassy_sync::pubsub::Error,
+> {
     NOTIFICATION_CHANNEL.publisher()
 }

@@ -8,12 +8,19 @@
 //! updating `memory.x` ensures a rebuild of the application with the
 //! new memory settings.
 
-use std::env;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
+#[cfg(feature = "host")]
+fn create_cfg() {
+    // Configuration generation code for host targets would go here.
+}
 
-fn main() {
+#[cfg(not(feature = "host"))]
+fn create_cfg() {
+    // Configuration generation code for non-host targets would go here.
+    use std::env;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
+
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -31,4 +38,8 @@ fn main() {
 
     println!("cargo:rustc-link-arg-bins=--nmagic");
     println!("cargo:rustc-link-arg-bins=-Tlink.x");
+}
+
+fn main() {
+    create_cfg();
 }

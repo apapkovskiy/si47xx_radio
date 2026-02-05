@@ -11,14 +11,13 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use embedded_io::Write;
 
-use embassy_nrf::uarte;
+use crate::boards::hal::*;
 
 /// Thin wrapper that stores a shared UARTE TX handle and exposes a
 /// `Write`-compatible API.
-struct SerialPort<'a>(&'a Mutex<RefCell<Option<uarte::UarteTx<'a>>>>);
+struct SerialPort<'a>(&'a Mutex<RefCell<Option<HalUartTx>>>);
 
-static WRITER_MUTEX: Mutex<RefCell<Option<uarte::UarteTx<'static>>>> =
-    Mutex::new(RefCell::new(None));
+static WRITER_MUTEX: Mutex<RefCell<Option<HalUartTx>>> = Mutex::new(RefCell::new(None));
 static WRITER_OUT: SerialPort = SerialPort(&WRITER_MUTEX);
 
 pub mod console_colors {
@@ -53,14 +52,14 @@ pub fn stdout_get() -> StdOut {
 /// Install the TX half of a configured UARTE instance as the global writer.
 ///
 /// Call this once during startup after the peripheral has been initialized.
-pub fn stdout_init(tx: uarte::UarteTx<'static>) {
+pub fn stdout_init(tx: HalUartTx) {
     WRITER_OUT.init(tx);
 }
 
 impl<'a> SerialPort<'a> {
     /// Store the provided TX handle and emit a leading newline so that early
     /// logs start on a clean line. Safe to call only once during boot.
-    fn init(&'a self, tx: uarte::UarteTx<'a>) {
+    fn init(&'a self, tx: HalUartTx) {
         critical_section::with(|cs| {
             self.0.borrow_ref_mut(cs).replace(tx);
             self.write(b"\n").ok();
@@ -71,7 +70,7 @@ impl<'a> SerialPort<'a> {
     /// The function always returns `Ok(buf.len())`; if UART TX is not yet
     /// installed the bytes are silently dropped. This keeps logging sites
     /// lightweight and failure-tolerant during early boot.
-    fn write(&self, buf: &[u8]) -> Result<usize, uarte::Error> {
+    fn write(&self, buf: &[u8]) -> Result<usize, HalUartError> {
         critical_section::with(|cs| {
             // This code runs within a critical section.
             if let Some(tx) = self.0.borrow_ref_mut(cs).as_mut() {
@@ -87,7 +86,7 @@ impl<'a> SerialPort<'a> {
 pub struct StdOut;
 
 impl embedded_io::ErrorType for StdOut {
-    type Error = uarte::Error;
+    type Error = HalUartError;
 }
 
 impl embedded_io::Write for StdOut {

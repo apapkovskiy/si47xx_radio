@@ -1,9 +1,10 @@
 #![no_std]
-#![no_main]
+#![cfg_attr(not(feature = "host"), no_main)]
 
 use embassy_executor::Spawner;
 use embassy_futures::yield_now;
 use embassy_time::Timer;
+use embedded_hal::digital::OutputPin;
 use log::{info, warn};
 use panic_probe as _;
 
@@ -16,11 +17,10 @@ mod serial_logger;
 use si473x::Si47xxDevice;
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn run(spawner: Spawner) {
     let mut led = hal_led_create();
 
-    let uart = hal_uart_create();
-    let (tx, rx) = uart.split();
+    let (tx, rx) = hal_uart_create();
     console::stdout_init(tx);
     serial_logger::init().unwrap();
 
@@ -58,9 +58,9 @@ async fn main(spawner: Spawner) {
         .await;
 
     loop {
-        led.set_high();
+        let _ = OutputPin::set_high(&mut led);
         Timer::after_millis(300).await;
-        led.set_low();
+        let _ = OutputPin::set_low(&mut led);
         Timer::after_millis(300).await;
         let event = events::event_receive().await;
         info!("Received event: {:?}", event);

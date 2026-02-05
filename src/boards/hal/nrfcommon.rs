@@ -42,7 +42,9 @@ pub type HalQspi = qspi::Qspi<'static>;
 /// UART serial interface type.
 ///
 /// Used for console output, debugging, and user interaction.
-pub type HalUart = uarte::Uarte<'static>;
+pub type HalUartTx = uarte::UarteTx<'static>;
+pub type HalUartRx = uarte::UarteRx<'static>;
+pub type HalUartError = uarte::Error;
 
 /// Two-Wire Interface Master (I2C) type.
 ///
