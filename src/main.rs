@@ -5,6 +5,7 @@ use embassy_executor::Spawner;
 use embassy_futures::yield_now;
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
+use linkme::distributed_slice;
 use log::{info, warn};
 use panic_probe as _;
 
@@ -15,6 +16,12 @@ use crate::boards::hal::*;
 pub mod events;
 mod serial_logger;
 use si473x::Si47xxDevice;
+mod settings;
+use settings::{OPTIONS, Settings, option::OptionString};
+mod storage;
+
+#[distributed_slice(OPTIONS)]
+pub static CONFIG_RADIO_MODE: OptionString<64> = OptionString::new("radio_mode", "AM");
 
 #[embassy_executor::main]
 async fn run(spawner: Spawner) {
@@ -23,6 +30,15 @@ async fn run(spawner: Spawner) {
     let (tx, rx) = hal_uart_create();
     console::stdout_init(tx);
     serial_logger::init().unwrap();
+    Settings::init(0, 32 * 4096).await.unwrap();
+    CONFIG_RADIO_MODE.set("FM").await;
+    Settings::save().await.unwrap();
+    let radio_mode = CONFIG_RADIO_MODE.get().await;
+    info!("CONFIG_RADIO_MODE: {}", radio_mode);
+    CONFIG_RADIO_MODE.set("SBB").await;
+    Settings::load().await.unwrap();
+    let radio_mode = CONFIG_RADIO_MODE.get().await;
+    info!("CONFIG_RADIO_MODE: {}", radio_mode);
 
     let twi = hal_twi_create();
     let reset_pin = hal_radio_reset_create();

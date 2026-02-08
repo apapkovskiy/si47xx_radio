@@ -13,9 +13,7 @@ use std::io::Stdout as StdoutSync;
 /// Implementation of embedded_io_async::Error for the host environment.
 impl embedded_io_async::Error for Error {
     fn kind(&self) -> embedded_io_async::ErrorKind {
-        match *self {
-            Error::FakeError => embedded_io_async::ErrorKind::Other,
-        }
+        embedded_io_async::ErrorKind::Other
     }
 }
 

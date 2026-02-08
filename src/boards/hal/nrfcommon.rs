@@ -15,7 +15,9 @@
 //! The module exports type aliases for Embassy HAL peripherals to simplify
 //! board-specific implementations:
 //! - [`HalQspi`]: QSPI flash interface
-//! - [`HalUart`]: UART serial interface
+//! - [`HalUartTx`]: UART serial transmit interface
+//! - [`HalUartRx`]: UART serial receive interface
+//! - [`HalUartError`]: UART error type
 //! - [`HalTwim`]: Two-Wire Interface Master (I2C)
 //! - [`HalOutput`]: GPIO output pin
 

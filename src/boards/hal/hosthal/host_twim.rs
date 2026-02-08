@@ -11,9 +11,7 @@ use super::Error;
 /// This allows the host error type to be used with embedded-hal async I2C traits.
 impl embedded_hal_async::i2c::Error for Error {
     fn kind(&self) -> embedded_hal_async::i2c::ErrorKind {
-        match *self {
-            Error::FakeError => embedded_hal_async::i2c::ErrorKind::Other,
-        }
+        embedded_hal_async::i2c::ErrorKind::Other
     }
 }
 
@@ -36,7 +34,10 @@ impl embedded_hal_async::i2c::ErrorType for HostTwim {
 impl embedded_hal_async::i2c::I2c for HostTwim {
     /// Simulates reading data from an I2C device.
     ///
-    /// Fills the buffer with 0x80 to simulate the CTS (Clear To Send) bit
+    /// Fills the buffer with 0x81 to simulate
+    ///  - CTS (Clear To Send) bit (0x80)
+    ///  - STCINT (Status Change Interrupt) (0x01)
+    ///
     /// being set in a status byte, which is common in radio chip communication.
     ///
     /// # Arguments
@@ -48,7 +49,7 @@ impl embedded_hal_async::i2c::I2c for HostTwim {
     ///
     /// Always returns `Ok(())` to simulate a successful read.
     async fn read(&mut self, _address: u8, buffer: &mut [u8]) -> Result<(), Self::Error> {
-        buffer.fill(0x80); // Simulate setting CTS bit in status byte
+        buffer.fill(0x81); // Simulate setting CTS bit in status byte
         Ok(())
     }
 

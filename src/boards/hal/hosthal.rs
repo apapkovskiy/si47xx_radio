@@ -11,12 +11,21 @@ mod host_twim;
 use host_twim::HostTwim;
 pub use host_twim::hal_twi_create;
 
+mod host_nor_flash;
+use host_nor_flash::HostNorFlash;
+pub use host_nor_flash::hal_qspi_create;
+
 mod host_digital;
 use host_digital::HostOutputPin;
 
 #[derive(Debug)]
 pub enum Error {
     FakeError,
+    ReadError,
+    WriteError,
+    EraseError,
+    OpenError,
+    SeekError,
 }
 
 pub type HalUartTx = HostUartTxBlocking;
@@ -24,6 +33,7 @@ pub type HalUartRx = HostUartRx;
 pub type HalUartError = Error;
 pub type HalTwim = HostTwim;
 pub type HalOutput = HostOutputPin;
+pub type HalQspi = HostNorFlash;
 
 /// Creates and returns a simulated reset pin for the radio.
 /// This pin can be used to control the reset line of the SI47xx radio chip
