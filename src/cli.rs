@@ -96,7 +96,7 @@ impl<'d> PromptStatus<'d> {
         self.prompt.get_mut().clear();
         let _ = write!(
             self.prompt.get_mut(),
-            "{BOLD_GREEN}radio-cli {BOLD_BLUE}{:?} {BOLD_YELLOW}{:.1} MHz{BOLD_GREEN})>{RESET} ",
+            "{BOLD_GREEN}radio-cli ({BOLD_BLUE}{:?} {BOLD_YELLOW}{:.1} MHz{BOLD_GREEN})>{RESET} ",
             self.mode,
             self.frequency,
         );
