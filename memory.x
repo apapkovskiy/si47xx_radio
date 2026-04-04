@@ -5,3 +5,12 @@ MEMORY
   FLASH : ORIGIN = 0x00000000, LENGTH = 1024K
   RAM : ORIGIN = 0x20000000, LENGTH = 256K
 }
+
+SECTIONS
+{
+  linkme :{
+    __start_linkme_OPTIONS = .;
+    *(linkme_OPTIONS*);
+    __stop_linkme_OPTIONS = .;
+  } > FLASH
+} INSERT AFTER .text;

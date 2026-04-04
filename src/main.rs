@@ -20,8 +20,9 @@ mod settings;
 use settings::{OPTIONS, Settings, option::OptionString};
 mod storage;
 
+static CONFIG_RADIO_MODE_INST: OptionString<64> = OptionString::new("radio_mode", "AM");
 #[distributed_slice(OPTIONS)]
-pub static CONFIG_RADIO_MODE: OptionString<64> = OptionString::new("radio_mode", "AM");
+pub static CONFIG_RADIO_MODE: &'static OptionString<64> = &CONFIG_RADIO_MODE_INST;
 
 #[embassy_executor::main]
 async fn run(spawner: Spawner) {

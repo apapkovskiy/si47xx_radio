@@ -8,18 +8,6 @@
 //! // Initialize the settings database
 //! Settings::init(0x40000, 64 * 1024).await.unwrap();
 //!
-//! // Get settings instance
-//! let settings = Settings::get().await.unwrap();
-//!
-//! // Set and get values
-//! settings.set_int("volume", 50).await.unwrap();
-//! let volume = settings.get_int("volume", 10).await; // Returns 50
-//!
-//! settings.set_bool("muted", true).await.unwrap();
-//! let muted = settings.get_bool("muted", false).await; // Returns true
-//!
-//! settings.set_string("station", "Radio 1").await.unwrap();
-//! let station = settings.get_string("station", "Default").await; // Returns "Radio 1"
 //! ```
 use crate::boards::hal::*;
 use crate::storage::Storage;
@@ -37,7 +25,7 @@ pub mod option;
 use option::OptionString;
 
 #[distributed_slice]
-pub static OPTIONS: [OptionString<64>];
+pub static OPTIONS: [&'static OptionString<64>];
 
 /// Maximum string length for stored values
 pub const MAX_STRING_LENGTH: usize = 64;
