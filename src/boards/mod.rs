@@ -38,4 +38,7 @@ pub mod hal {
     pub mod hosthal;
     pub use embedded_hal::digital::OutputPin;
     pub use hosthal::*;
+    pub fn hal_init() {
+        // No hardware initialization needed for host builds
+    }
 }
