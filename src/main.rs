@@ -5,8 +5,7 @@ use embassy_executor::Spawner;
 use embassy_futures::yield_now;
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
-use linkme::distributed_slice;
-use log::{info, warn};
+use log::info;
 use panic_probe as _;
 
 pub mod boards;
@@ -15,64 +14,29 @@ pub mod console;
 use crate::boards::hal::*;
 pub mod events;
 mod serial_logger;
-use si473x::Si47xxDevice;
+use si473x::{Si47xxDevice, Si47xxRadio};
 mod settings;
-use settings::{OPTIONS, Settings, option::OptionString};
+use settings::Settings;
+mod radio;
+use radio::Radio;
 mod storage;
-
-static CONFIG_RADIO_MODE_INST: OptionString<64> = OptionString::new("radio_mode", "AM");
-#[distributed_slice(OPTIONS)]
-pub static CONFIG_RADIO_MODE: &'static OptionString<64> = &CONFIG_RADIO_MODE_INST;
 
 #[embassy_executor::main]
 async fn run(spawner: Spawner) {
     let mut led = hal_led_create();
-
     let (tx, rx) = hal_uart_create();
     console::stdout_init(tx);
     serial_logger::init().unwrap();
     Settings::init(0, 32 * 4096).await.unwrap();
-    CONFIG_RADIO_MODE.set("FM").await;
-    Settings::save().await.unwrap();
-    let radio_mode = CONFIG_RADIO_MODE.get().await;
-    info!("CONFIG_RADIO_MODE: {}", radio_mode);
-    CONFIG_RADIO_MODE.set("SBB").await;
-    Settings::load().await.unwrap();
-    let radio_mode = CONFIG_RADIO_MODE.get().await;
-    info!("CONFIG_RADIO_MODE: {}", radio_mode);
-
+    Settings::load().await.expect("Failed to load settings");
     let twi = hal_twi_create();
     let reset_pin = hal_radio_reset_create();
-    let mut radio_dev: Si47xxDevice<_, _> = Si47xxDevice::new(twi, reset_pin);
-    radio_dev.reset().await;
-    radio_dev.init_fm().await.expect("Radio init failed");
-    warn!("Radio initialized!");
-    let revision = radio_dev
-        .revision_get()
-        .await
-        .expect("Failed to get revision");
-    radio_dev.sound_on().await.expect("Failed to unmute sound");
-
+    let radio_dev: Si47xxDevice<_, _> = Si47xxDevice::new(twi, reset_pin);
     let _ = spawner.spawn(cli::my_task(rx));
     yield_now().await;
-
-    let mut radio = radio_dev.fm().await.expect("Failed to switch to FM mode");
     let notification_publisher = events::notify_publisher().unwrap();
-    notification_publisher
-        .publish(events::SystemNotify::RadioFmOn)
-        .await;
-    yield_now().await;
-    notification_publisher
-        .publish(events::SystemNotify::RevisionInfo(revision))
-        .await;
-    yield_now().await;
-    let tune_status = radio
-        .tune_status_get()
-        .await
-        .expect("Failed to get tune status");
-    notification_publisher
-        .publish(events::SystemNotify::TuneStatus(tune_status))
-        .await;
+    let mut radio = Radio::new(Si47xxRadio::Off(radio_dev));
+    radio = radio.init(&notification_publisher).await.unwrap();
 
     loop {
         let _ = OutputPin::set_high(&mut led);
@@ -82,30 +46,17 @@ async fn run(spawner: Spawner) {
         let event = events::event_receive().await;
         info!("Received event: {:?}", event);
         match event {
-            events::SystemEvent::RadioVolumeUp => {
-                radio.volume_up().await.expect("Volume up failed");
+            events::SystemEvent::RadioFmOn => {
+                radio = radio.fm().await.unwrap();
             }
-            events::SystemEvent::RadioVolumeDown => {
-                radio.volume_down().await.expect("Volume down failed");
+            events::SystemEvent::RadioAmOn => {
+                radio = radio.am().await.unwrap();
             }
-            events::SystemEvent::RadioSetFrequency(freq) => {
-                let tune_status = radio
-                    .tune_frequency(freq)
-                    .await
-                    .expect("Set frequency failed");
-                notification_publisher
-                    .publish(events::SystemNotify::TuneStatus(tune_status))
-                    .await;
-            }
-            events::SystemEvent::RadioSeekUp => {
-                let tune_status = radio.seek_up().await.expect("Seek up failed");
-                info!("Seeked up: {:?}", tune_status);
-                notification_publisher
-                    .publish(events::SystemNotify::TuneStatus(tune_status))
-                    .await;
+            events::SystemEvent::RadioOff => {
+                radio = radio.off().await.unwrap();
             }
             _ => {
-                info!("Event not handled in main loop");
+                radio.handle_event(event, &notification_publisher).await;
             }
         }
     }

@@ -66,6 +66,8 @@ pub enum SystemNotify {
     VolumeChanged(u8),
 }
 
+pub type NtfPublisher<'a> = Publisher<'a, CriticalSectionRawMutex, SystemNotify, 4, 4, 2>;
+
 /// Notification channel for broadcasting system notifications.
 static NOTIFICATION_CHANNEL: PubSubChannel<CriticalSectionRawMutex, SystemNotify, 4, 4, 2> =
     PubSubChannel::new();
@@ -102,9 +104,6 @@ pub fn notify_subscriber<'a>() -> Result<
 /// Create a new publisher for system notifications.
 ///
 /// Returns a [`Publisher`] that can send notifications to all subscribers.
-pub fn notify_publisher<'a>() -> Result<
-    Publisher<'a, CriticalSectionRawMutex, SystemNotify, 4, 4, 2>,
-    embassy_sync::pubsub::Error,
-> {
+pub fn notify_publisher<'a>() -> Result<NtfPublisher<'a>, embassy_sync::pubsub::Error> {
     NOTIFICATION_CHANNEL.publisher()
 }
