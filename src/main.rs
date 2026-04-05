@@ -23,6 +23,7 @@ mod storage;
 
 #[embassy_executor::main]
 async fn run(spawner: Spawner) {
+    hal_init();
     let mut led = hal_led_create();
     let (tx, rx) = hal_uart_create();
     console::stdout_init(tx);

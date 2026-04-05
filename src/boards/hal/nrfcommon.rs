@@ -57,3 +57,7 @@ pub type HalTwim = twim::Twim<'static>;
 ///
 /// Used for control signals such as radio reset and LED indicators.
 pub type HalOutput = Output<'static>;
+
+pub fn hal_init() {
+    let _ = embassy_nrf::init(Default::default());
+}
