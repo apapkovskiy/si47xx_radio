@@ -18,7 +18,7 @@ repos:
 
       - id: cargo-clippy
         name: cargo clippy
-        entry: cargo clippy -- -D warnings
+        entry: cargo clippy --features "nrf5340dk,nrf7002dk" -- -D warnings
         language: system
         types: [rust]
         pass_filenames: false
