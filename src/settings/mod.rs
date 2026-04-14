@@ -20,6 +20,7 @@ use embassy_sync::once_lock::OnceLock;
 use embedded_storage_async::nor_flash::{ErrorType, NorFlash, ReadNorFlash};
 use heapless::{String, Vec};
 use linkme::distributed_slice;
+use log::warn;
 
 pub mod option;
 use option::OptionString;
@@ -114,6 +115,7 @@ impl Settings {
         let db = Database::new(Flash { partition }, config);
         let ret = db.mount().await;
         if ret.is_err() {
+            warn!("Database mount failed, attempting to format flash");
             db.format().await.map_err(SettingsError::FormatError)?;
         }
         DB.init(db).map_err(|_| SettingsError::AlreadyInitialized)?;
@@ -128,9 +130,14 @@ impl Settings {
             buffer
                 .resize_default(MAX_STRING_LENGTH)
                 .map_err(|_| SettingsError::CapacityError)?;
-            rtx.read(option.get_key().as_bytes(), &mut buffer)
-                .await
-                .map_err(SettingsError::ReadError)?;
+            match rtx.read(option.get_key().as_bytes(), &mut buffer).await {
+                Ok(_) => (),
+                Err(ReadError::KeyNotFound) => {
+                    // Key not found, the default value will be used
+                    continue;
+                }
+                Err(e) => return Err(SettingsError::ReadError(e)),
+            };
             let mut str = option.str.write().await;
             *str =
                 SettingsString::from_utf8(buffer).map_err(|_| SettingsError::SerializationError)?;
