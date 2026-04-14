@@ -25,6 +25,7 @@ use embassy_nrf::gpio::Output;
 use embassy_nrf::peripherals::{QSPI, SERIAL0, SERIAL1};
 use embassy_nrf::qspi;
 use embassy_nrf::{bind_interrupts, twim, uarte};
+use nrf_pac as pac;
 
 // Interrupt bindings for nRF peripherals.
 //
@@ -60,4 +61,7 @@ pub type HalOutput = Output<'static>;
 
 pub fn hal_init() {
     let _ = embassy_nrf::init(Default::default());
+    pac::CLOCK_S
+        .hfclkctrl()
+        .write(|w| w.set_hclk(pac::clock::vals::Hclk::DIV2));
 }

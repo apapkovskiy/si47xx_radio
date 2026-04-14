@@ -5,8 +5,9 @@ use embassy_executor::Spawner;
 use embassy_futures::yield_now;
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
-use log::info;
+use log::{error, info};
 use panic_probe as _;
+use rtt_target::rtt_init_print;
 
 pub mod boards;
 mod cli;
@@ -24,12 +25,24 @@ mod storage;
 #[embassy_executor::main]
 async fn run(spawner: Spawner) {
     hal_init();
-    let mut led = hal_led_create();
+    // Initialize RTT for exception and panic logging
+    rtt_init_print!();
+
     let (tx, rx) = hal_uart_create();
     console::stdout_init(tx);
     serial_logger::init().unwrap();
-    Settings::init(0, 32 * 4096).await.unwrap();
-    Settings::load().await.expect("Failed to load settings");
+
+    // Initialize settings database
+    match Settings::init(0, 32 * 4096).await {
+        Ok(_) => {
+            Settings::load().await.unwrap_or_else(|e| {
+                error!("Failed to load settings: {:?}", e);
+            });
+        }
+        Err(e) => error!("Failed to initialize settings: {:?}", e),
+    }
+
+    let mut led = hal_led_create();
     let twi = hal_twi_create();
     let reset_pin = hal_radio_reset_create();
     let radio_dev: Si47xxDevice<_, _> = Si47xxDevice::new(twi, reset_pin);

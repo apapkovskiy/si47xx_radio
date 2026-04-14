@@ -21,17 +21,20 @@ jobs:
           components: clippy, rustfmt
           targets: thumbv8m.main-none-eabihf, x86_64-unknown-linux-gnu
 
-      - name: Build
-        run: cargo build
+      - name: Build Host
+        run: cargo build --features host --no-default-features --target x86_64-unknown-linux-gnu
+
+      - name: Build Arm
+        run: cargo build --features "nrf5340dk" --no-default-features --target=thumbv8m.main-none-eabihf
 
       - name: Format
         run: cargo fmt --all -- --check
 
       - name: Clippy Arm
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --features "nrf5340dk" --no-default-features -- -D warnings
 
       - name: Clippy Host
         run: cargo clippy --features host --no-default-features --target x86_64-unknown-linux-gnu -- -D warnings
 
       - name: Docs
-        run: cargo doc
+        run: cargo doc --features host --no-default-features --no-deps --target x86_64-unknown-linux-gnu
