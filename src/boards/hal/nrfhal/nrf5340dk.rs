@@ -124,6 +124,7 @@ pub fn hal_qspi_create() -> HalQspi {
     config.write_opcode = qspi::WriteOpcode::PP4IO;
     config.write_page_size = qspi::WritePageSize::_256BYTES;
     config.frequency = qspi::Frequency::M32;
+    config.capacity = 8 * 1024 * 1024; // 8 MB
     let qspi = unsafe { peripherals::QSPI::steal() };
     let sck = unsafe { peripherals::P0_17::steal() };
     let csn = unsafe { peripherals::P0_18::steal() };

@@ -27,6 +27,14 @@ use embassy_nrf::qspi;
 use embassy_nrf::{bind_interrupts, twim, uarte};
 use nrf_pac as pac;
 
+pub mod nrf5340dk;
+pub mod nrf7002dk;
+
+#[cfg(feature = "nrf5340dk")]
+pub use nrf5340dk::*;
+#[cfg(feature = "nrf7002dk")]
+pub use nrf7002dk::*;
+
 // Interrupt bindings for nRF peripherals.
 //
 // This macro binds interrupt handlers to the respective peripheral drivers
