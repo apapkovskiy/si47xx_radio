@@ -2,8 +2,5 @@
 # replace nRF5340_xxAA with your chip as listed in `probe-rs chip list`
 runner = "probe-rs run --chip nRF5340_xxAA"
 
-[build]
-target = "thumbv8m.main-none-eabihf"
-
-[env]
-DEFMT_LOG = "debug"
+# [build]
+# target = "thumbv8m.main-none-eabihf"

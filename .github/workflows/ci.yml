@@ -30,8 +30,11 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      - name: Clippy Arm
-        run: cargo clippy --features "nrf5340dk" --no-default-features -- -D warnings
+      - name: Clippy nrf5340dk
+        run: cargo clippy --features "nrf5340dk" --no-default-features --target=thumbv8m.main-none-eabihf -- -D warnings
+
+      - name: Clippy nrf7002dk
+        run: cargo clippy --features "nrf7002dk" --no-default-features --target=thumbv8m.main-none-eabihf -- -D warnings
 
       - name: Clippy Host
         run: cargo clippy --features host --no-default-features --target x86_64-unknown-linux-gnu -- -D warnings
