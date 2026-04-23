@@ -31,10 +31,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy nrf5340dk
-        run: cargo clippy --features "nrf5340dk" --no-default-features --target=thumbv8m.main-none-eabihf -- -D warnings
+        run: cargo clippy --features "nrf5340dk" --no-default-features --target=thumbv8m.main-none-eabihf -- -D warnings -W clippy::large_stack_frames
 
       - name: Clippy nrf7002dk
-        run: cargo clippy --features "nrf7002dk" --no-default-features --target=thumbv8m.main-none-eabihf -- -D warnings
+        run: cargo clippy --features "nrf7002dk" --no-default-features --target=thumbv8m.main-none-eabihf -- -D warnings -W clippy::large_stack_frames
 
       - name: Clippy Host
         run: cargo clippy --features host --no-default-features --target x86_64-unknown-linux-gnu -- -D warnings
