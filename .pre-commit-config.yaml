@@ -18,13 +18,13 @@ repos:
 
       - id: cargo-clippy-nrf7002dk
         name: cargo clippy
-        entry: cargo clippy --features "nrf7002dk" --target=thumbv8m.main-none-eabihf --no-default-features -- -D warnings
+        entry: cargo clippy --features "nrf7002dk" --target=thumbv8m.main-none-eabihf --no-default-features -- -D warnings -W clippy::large_stack_frames
         language: system
         types: [rust]
         pass_filenames: false
       - id: cargo-clippy-nrf5340dk
         name: cargo clippy
-        entry: cargo clippy --features "nrf5340dk" --target=thumbv8m.main-none-eabihf --no-default-features -- -D warnings
+        entry: cargo clippy --features "nrf5340dk" --target=thumbv8m.main-none-eabihf --no-default-features -- -D warnings -W clippy::large_stack_frames
         language: system
         types: [rust]
         pass_filenames: false

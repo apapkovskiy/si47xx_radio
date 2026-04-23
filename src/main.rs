@@ -22,7 +22,7 @@ mod radio;
 use radio::Radio;
 mod storage;
 
-#[embassy_executor::main]
+#[allow(clippy::large_stack_frames)]
 async fn run(spawner: Spawner) {
     hal_init();
     // Initialize RTT for exception and panic logging
@@ -74,4 +74,9 @@ async fn run(spawner: Spawner) {
             }
         }
     }
+}
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
+    run(spawner).await;
 }

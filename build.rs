@@ -8,6 +8,8 @@
 //! updating `memory.x` ensures a rebuild of the application with the
 //! new memory settings.
 
+#![allow(clippy::large_stack_frames)]
+
 #[cfg(feature = "host")]
 fn create_cfg() {
     // Configuration generation code for host targets would go here.

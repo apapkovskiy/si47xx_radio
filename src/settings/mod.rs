@@ -98,6 +98,12 @@ impl flash::Flash for Flash {
 pub struct Settings;
 
 impl Settings {
+    #[allow(clippy::large_stack_frames)]
+    fn init_db(offset: u32, size: u32) -> SettingsDb {
+        let partition = Storage::partition(offset, size);
+        let config = Config::default();
+        Database::new(Flash { partition }, config)
+    }
     /// Initialize the settings database with a flash partition.
     ///
     /// # Arguments
@@ -107,18 +113,17 @@ impl Settings {
     /// # Returns
     /// * `Ok(())` if initialization succeeds
     /// * `Err(SettingsError)` if already initialized or other error
+    #[allow(clippy::large_stack_frames)]
     pub async fn init(offset: u32, size: u32) -> Result<(), SettingsError> {
-        let partition = Storage::partition(offset, size);
-
-        // Create database with default configuration
-        let config = Config::default();
-        let db = Database::new(Flash { partition }, config);
+        if DB.is_set() {
+            return Err(SettingsError::AlreadyInitialized);
+        }
+        let db = DB.get_or_init(|| Settings::init_db(offset, size));
         let ret = db.mount().await;
         if ret.is_err() {
             warn!("Database mount failed, attempting to format flash");
             db.format().await.map_err(SettingsError::FormatError)?;
         }
-        DB.init(db).map_err(|_| SettingsError::AlreadyInitialized)?;
         Ok(())
     }
 
@@ -145,6 +150,7 @@ impl Settings {
         Ok(())
     }
 
+    #[allow(clippy::large_stack_frames)]
     pub async fn save() -> Result<(), SettingsError> {
         let db = DB.get().await;
         let mut wtx = db.write_transaction().await;
