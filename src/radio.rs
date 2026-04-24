@@ -95,9 +95,7 @@ where
     }
 
     pub async fn init(mut self, publisher: &NtfPublisher<'_>) -> Result<Self, ()> {
-        warn!("Radio reset starting...");
         self.radio = self.radio.reset().await;
-        warn!("Radio reset complete");
         self.mode = RadioMode::get().await;
         warn!("Initializing radio in {:?} mode", self.mode);
         self.radio = match self.mode {

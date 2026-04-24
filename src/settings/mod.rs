@@ -30,6 +30,7 @@ pub static OPTIONS: [&'static OptionString<64>];
 
 /// Maximum string length for stored values
 pub const MAX_STRING_LENGTH: usize = 64;
+const WRITE_BUFFER_SIZE: usize = 64;
 
 /// Type alias for fixed-size strings
 pub type SettingsString = String<MAX_STRING_LENGTH>;
@@ -58,6 +59,8 @@ pub enum SettingsError<E = <FlashPartition as ErrorType>::Error> {
     SerializationError,
     /// Formatting error
     FormatError(FormatError<E>),
+    /// Erase error
+    EraseError(E),
     /// Commit error
     CommitError(CommitError<E>),
 }
@@ -84,8 +87,20 @@ impl flash::Flash for Flash {
         offset: usize,
         data: &[u8],
     ) -> Result<(), Self::Error> {
-        let address = page_id.index() * config::PAGE_SIZE + offset;
-        self.partition.write(address as u32, data).await
+        let base_address = page_id.index() * config::PAGE_SIZE + offset;
+        // Some Flash drivers cannot write directly from code/flash,
+        // so copy each chunk through a small RAM buffer first.
+        let mut write_buffer = [0u8; WRITE_BUFFER_SIZE];
+
+        for (chunk_index, chunk) in data.chunks(WRITE_BUFFER_SIZE).enumerate() {
+            write_buffer[..chunk.len()].copy_from_slice(chunk);
+            let address = base_address + chunk_index * WRITE_BUFFER_SIZE;
+            self.partition
+                .write(address as u32, &write_buffer[..chunk.len()])
+                .await?;
+        }
+
+        Ok(())
     }
 
     async fn erase(&mut self, page_id: PageID) -> Result<(), Self::Error> {
@@ -119,9 +134,16 @@ impl Settings {
             return Err(SettingsError::AlreadyInitialized);
         }
         let db = DB.get_or_init(|| Settings::init_db(offset, size));
+        // Checking if the database was formatted, if not, format it
         let ret = db.mount().await;
         if ret.is_err() {
             warn!("Database mount failed, attempting to format flash");
+            db.lock_flash()
+                .await
+                .partition
+                .erase(0, size)
+                .await
+                .map_err(SettingsError::EraseError)?;
             db.format().await.map_err(SettingsError::FormatError)?;
         }
         Ok(())
@@ -135,8 +157,8 @@ impl Settings {
             buffer
                 .resize_default(MAX_STRING_LENGTH)
                 .map_err(|_| SettingsError::CapacityError)?;
-            match rtx.read(option.get_key().as_bytes(), &mut buffer).await {
-                Ok(_) => (),
+            let len = match rtx.read(option.get_key().as_bytes(), &mut buffer).await {
+                Ok(len) => len,
                 Err(ReadError::KeyNotFound) => {
                     // Key not found, the default value will be used
                     continue;
@@ -146,6 +168,7 @@ impl Settings {
             let mut str = option.str.write().await;
             *str =
                 SettingsString::from_utf8(buffer).map_err(|_| SettingsError::SerializationError)?;
+            str.truncate(len);
         }
         Ok(())
     }
