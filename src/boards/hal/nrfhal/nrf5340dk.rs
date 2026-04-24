@@ -103,9 +103,8 @@ pub fn hal_uart_create() -> (HalUartTx, HalUartRx) {
 /// Creates the QSPI flash interface for persistent storage.
 ///
 /// Configures the QSPI peripheral with:
-/// - Frequency: 32 MHz
-/// - Read opcode: READ4IO (quad I/O read)
-/// - Write opcode: PP4IO (quad I/O page program)
+/// - Read opcode: FASTREAD
+/// - Write opcode: PP
 /// - Page size: 256 bytes
 /// - Pins:
 ///   - SCK: P0.17 (Clock)
@@ -120,10 +119,10 @@ pub fn hal_uart_create() -> (HalUartTx, HalUartRx) {
 /// A configured QSPI instance ready for flash memory operations.
 pub fn hal_qspi_create() -> HalQspi {
     let mut config = qspi::Config::default();
-    config.read_opcode = qspi::ReadOpcode::READ4IO;
-    config.write_opcode = qspi::WriteOpcode::PP4IO;
+    config.read_opcode = qspi::ReadOpcode::FASTREAD;
+    config.write_opcode = qspi::WriteOpcode::PP;
     config.write_page_size = qspi::WritePageSize::_256BYTES;
-    config.frequency = qspi::Frequency::M32;
+    config.frequency = qspi::Frequency::M8;
     config.capacity = 8 * 1024 * 1024; // 8 MB
     let qspi = unsafe { peripherals::QSPI::steal() };
     let sck = unsafe { peripherals::P0_17::steal() };
