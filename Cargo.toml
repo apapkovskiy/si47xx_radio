@@ -21,6 +21,7 @@ static_cell = "2"
 panic-probe = { version = "1.0.0", features = ["print-rtt"] }
 rtt-target = "0.5.0"
 si473x = { git = "https://github.com/apapkovskiy/si473x-rs.git" }
+# si473x = { path  = "../si473x-rs" }
 heapless = "0.9.2"
 log = "0.4.29"
 linkme = "0.3.35"
@@ -47,6 +48,9 @@ embassy-executor = { version = "0.9.0", features = ["arch-std", "executor-thread
 critical-section = { version = "1.2.0", features = ["std"] }
 embassy-time = { version = "0.5.0", features = ["std", "log"] }
 libc = "0.2.180"
+
+[build-dependencies]
+built = { version = "0.7", features = ["git2"] }
 
 [patch.crates-io]
 ekv = { git = "https://github.com/embassy-rs/ekv", rev = "a7d0ce35b7d989f621575d838d211e546a54d2eb" }

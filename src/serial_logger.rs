@@ -41,7 +41,7 @@ impl log::Log for SerialLogger {
             let level_color = SerialLogger::get_level_color(record.level());
             let _ = write!(
                 console::stdout_get(),
-                "{level_color}[{:012}] <{}> {}:{}: {}{RESET}\r\n",
+                "\r{level_color}[{:012}] <{}> {}:{}: {}{RESET}\r\n",
                 seconds,
                 record.level(),
                 record.file().unwrap_or("unknown"),

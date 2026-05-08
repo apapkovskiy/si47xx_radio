@@ -135,13 +135,13 @@ fn cli_handle_notification(
             prompt_status.set_frequency(tune_status.frequency);
             write!(
                 writer,
-                "Tuned to frequency {} MHz, {:?}",
+                "Tuned to frequency {} MHz, {:#?}",
                 tune_status.frequency, tune_status
             )
             .ok();
         }
         _ => {
-            write!(writer, "Notification: {:?}", event).ok();
+            write!(writer, "Notification: {:#?}", event).ok();
         }
     }
 }
