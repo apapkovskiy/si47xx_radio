@@ -14,21 +14,6 @@ pub struct HostNorFlash;
 const FILE_PATH: &str = "host_flash.bin";
 
 pub fn hal_qspi_create() -> HostNorFlash {
-    let path = Path::new(FILE_PATH);
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(path)
-        .map_err(|_| Error::FakeError)
-        .unwrap();
-    let erase_data = [0xFF; HostNorFlash::ERASE_SIZE];
-    for _ in 0..(16 * 1024 * 1024 / 4096) {
-        file.write_all(&erase_data)
-            .map_err(|_| Error::FakeError)
-            .unwrap();
-    }
-
     HostNorFlash
 }
 

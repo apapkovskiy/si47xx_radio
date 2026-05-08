@@ -20,6 +20,8 @@ mod settings;
 use settings::Settings;
 mod radio;
 use radio::Radio;
+mod banner;
+use banner::print_banner;
 mod storage;
 
 #[allow(clippy::large_stack_frames)]
@@ -30,6 +32,7 @@ async fn run(spawner: Spawner) {
 
     let (tx, rx) = hal_uart_create();
     console::stdout_init(tx);
+    print_banner();
     serial_logger::init().unwrap();
 
     // Initialize settings database
