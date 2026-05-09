@@ -1,14 +1,20 @@
 use crate::boards::hal::*;
 use crate::console;
 use crate::events;
-use crate::events::SystemEvent;
 use crate::events::SystemNotify;
-use core::cell::Cell;
 use core::fmt::{Debug, Write};
-use core::marker::PhantomData;
 use embassy_futures::select::{Either, select};
 use embedded_cli::cli::CliBuilder;
 use embedded_cli::{Command, codes};
+
+mod cmd_mode;
+use cmd_mode::RadioMode;
+mod cmd_tune;
+use cmd_tune::TuneCommand;
+mod cmd_volume;
+use cmd_volume::VolumeCommand;
+mod prompt;
+use prompt::PromptStatus;
 
 pub const DEL: u8 = 127; // Delete character
 
@@ -28,89 +34,6 @@ enum BaseCommand {
     },
     /// Show some status
     Status,
-}
-
-#[derive(Debug, Command)]
-enum RadioMode {
-    /// FM Mode
-    FM,
-    /// AM Mode
-    AM,
-    /// Power down the radio
-    Off,
-}
-
-#[derive(Debug, Command)]
-enum TuneCommand {
-    /// Seek up
-    Up,
-    /// Seek down
-    Down,
-    /// Set frequency
-    Frequency {
-        /// Frequency in MHz
-        frequency: f32,
-    },
-}
-
-#[derive(Debug, Command)]
-enum VolumeCommand {
-    /// Increase volume
-    Up,
-    /// Decrease volume
-    Down,
-    /// Set volume to specific level
-    Set {
-        /// Volume level (0-100)
-        level: u8,
-    },
-}
-
-struct PromptStatus<'d> {
-    frequency: f32,
-    mode: RadioMode,
-    prompt: Cell<heapless::String<64>>,
-    _p: PhantomData<&'d ()>,
-}
-
-impl<'d> PromptStatus<'d> {
-    pub const fn new() -> Self {
-        Self {
-            frequency: 0.0,
-            mode: RadioMode::FM,
-            prompt: Cell::new(heapless::String::new()),
-            _p: PhantomData {},
-        }
-    }
-
-    fn get_prompt_str(&self) -> &'d str {
-        unsafe {
-            let ptr = self.prompt.as_ptr();
-            let str = &*ptr;
-            str.as_str()
-        }
-    }
-
-    pub fn get_prompt(&mut self) -> &'d str {
-        use crate::console::console_colors::*;
-        self.prompt.get_mut().clear();
-        let _ = write!(
-            self.prompt.get_mut(),
-            "{BOLD_GREEN}radio-cli ({BOLD_BLUE}{:?} {BOLD_YELLOW}{:.1} MHz{BOLD_GREEN})>{RESET} ",
-            self.mode,
-            self.frequency,
-        );
-        self.get_prompt_str()
-    }
-
-    pub fn set_mode(&mut self, mode: RadioMode) -> &mut Self {
-        self.mode = mode;
-        self
-    }
-    pub fn set_frequency(&mut self, frequency: f32) -> &mut Self {
-        self.frequency = frequency;
-        self
-    }
 }
 
 fn cli_handle_notification(
@@ -203,45 +126,15 @@ pub async fn my_task(mut rx: HalUartRx) {
                     Ok(())
                 }
                 BaseCommand::Mode { command } => {
-                    match command {
-                        RadioMode::FM => events::event_try_send(SystemEvent::RadioFmOn),
-                        RadioMode::AM => events::event_try_send(SystemEvent::RadioAmOn),
-                        RadioMode::Off => events::event_try_send(SystemEvent::RadioOff),
-                    }
+                    command.execute();
                     Ok(())
                 }
                 BaseCommand::Volume { command } => {
-                    match command {
-                        VolumeCommand::Up => {
-                            let _ = cli.writer().write_str("Volume increased");
-                            events::event_try_send(SystemEvent::RadioVolumeUp);
-                        }
-                        VolumeCommand::Down => {
-                            let _ = cli.writer().write_str("Volume decreased");
-                            events::event_try_send(SystemEvent::RadioVolumeDown);
-                        }
-                        VolumeCommand::Set { level } => {
-                            let _ = cli
-                                .writer()
-                                .write_fmt(format_args!("Volume set to {}", level));
-                            events::event_try_send(SystemEvent::RadioVolumeSet(level));
-                        }
-                    }
+                    command.execute(cli.writer());
                     Ok(())
                 }
                 BaseCommand::Tune { command } => {
-                    match command {
-                        TuneCommand::Up => {
-                            let _ = cli.writer().write_str("Tuning up");
-                            events::event_try_send(SystemEvent::RadioSeekUp);
-                        }
-                        TuneCommand::Down => {
-                            let _ = cli.writer().write_str("Tuning down not supported");
-                        }
-                        TuneCommand::Frequency { frequency } => {
-                            events::event_try_send(SystemEvent::RadioSetFrequency(frequency));
-                        }
-                    }
+                    command.execute(cli.writer());
                     Ok(())
                 }
             }),
