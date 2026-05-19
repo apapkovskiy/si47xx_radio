@@ -9,6 +9,10 @@ run_host:
 build_nrf:
 	@echo "Building nRF firmware..."
 	cargo objcopy --target=thumbv8m.main-none-eabihf --features="nrf5340dk" -- -O ihex target/firmware.hex
+	@echo "Flash and RAM usage:"
+	@cargo bloat --target=thumbv8m.main-none-eabihf --features="nrf5340dk" --bin si47x_radio --embedded --split-std --crates
+	@cargo size --target=thumbv8m.main-none-eabihf --features="nrf5340dk" --bin si47x_radio -- -A
+	@cargo size --target=thumbv8m.main-none-eabihf --features="nrf5340dk" --bin si47x_radio | awk 'NR==2 {sumFlash=$$1} {sumRam=$$2+$$3} END {printf "Flash Usage: %.2d, %.2f%%, RAM Usage: %.2d, %.2f%%\n", sumFlash, (sumFlash/1048576)*100, sumRam, (sumRam/262144)*100}'
 
 clippy_stack:
 	@echo "Running clippy to check for large stack frames"
