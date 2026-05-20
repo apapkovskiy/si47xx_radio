@@ -1,56 +1,12 @@
 use crate::events;
 use crate::events::NtfPublisher;
-use core::convert::{From, Into};
+use crate::settings::Settings;
 use embassy_futures::yield_now;
-use linkme::distributed_slice;
 use log::{info, warn};
-use si473x::Si47xx;
+use si473x::{RadioBand, Si47xx};
 
-use crate::settings::{OPTIONS, Settings, option::OptionString};
-
-static CONFIG_RADIO_MODE_INST: OptionString<64> = OptionString::new("radio_mode", "AM");
-#[distributed_slice(OPTIONS)]
-static CONFIG_RADIO_MODE: &'static OptionString<64> = &CONFIG_RADIO_MODE_INST;
-
-#[derive(Debug)]
-pub enum RadioMode {
-    /// FM Mode
-    FM,
-    /// AM Mode
-    AM,
-    /// Power down the radio
-    Off,
-}
-
-impl RadioMode {
-    pub async fn get() -> Self {
-        CONFIG_RADIO_MODE.get().await.as_str().into()
-    }
-    pub async fn save(&self) {
-        CONFIG_RADIO_MODE.set(self.into()).await;
-    }
-}
-
-impl From<&str> for RadioMode {
-    fn from(s: &str) -> Self {
-        match s {
-            "FM" => RadioMode::FM,
-            "AM" => RadioMode::AM,
-            "Off" => RadioMode::Off,
-            _ => RadioMode::Off, // Default to Off for unknown values
-        }
-    }
-}
-
-impl From<&RadioMode> for &'static str {
-    fn from(mode: &RadioMode) -> &'static str {
-        match mode {
-            RadioMode::FM => "FM",
-            RadioMode::AM => "AM",
-            RadioMode::Off => "Off",
-        }
-    }
-}
+mod mode;
+pub use mode::RadioMode;
 
 pub struct Radio<T>
 where
@@ -77,6 +33,33 @@ where
         self.radio = self.radio.am().await.expect("Failed to switch to AM mode");
         Settings::save().await.expect("Failed to save settings");
         Ok(self)
+    }
+
+    pub async fn band(&mut self, band: RadioBand, publisher: &NtfPublisher<'_>) {
+        match &self.mode {
+            RadioMode::Off => {
+                warn!("Cannot set band while radio is off");
+            }
+            _ => {
+                let Err(e) = self.radio.band_set(band).await else {
+                    publisher
+                        .publish(events::SystemNotify::BandChanged(band))
+                        .await;
+                    return;
+                };
+                warn!("Failed to set band, error: {:?}", e);
+            }
+        }
+    }
+
+    pub async fn property_list(&mut self, publisher: &NtfPublisher<'_>) {
+        let _ = self
+            .radio
+            .property_for_each(|id, value| {
+                let _ = publisher.try_publish(events::SystemNotify::RadioPropertyInfo(id, value));
+            })
+            .await
+            .inspect_err(|e| warn!("Failed to list properties: {:?}", e));
     }
 
     pub async fn fm(mut self) -> Result<Self, ()> {
@@ -141,16 +124,26 @@ where
     pub async fn handle_event(&mut self, event: events::SystemEvent, publisher: &NtfPublisher<'_>) {
         match event {
             events::SystemEvent::RadioVolumeUp => {
-                self.radio.volume_up().await.expect("Volume up failed");
-                publisher
-                    .publish(events::SystemNotify::VolumeChanged(0))
-                    .await;
+                let volume = self.radio.volume_up().await;
+                match volume {
+                    Ok(v) => {
+                        publisher
+                            .publish(events::SystemNotify::VolumeChanged(v))
+                            .await;
+                    }
+                    Err(e) => warn!("Failed to increase volume: {:?}", e),
+                }
             }
             events::SystemEvent::RadioVolumeDown => {
-                self.radio.volume_down().await.expect("Volume down failed");
-                publisher
-                    .publish(events::SystemNotify::VolumeChanged(0))
-                    .await;
+                let volume = self.radio.volume_down().await;
+                match volume {
+                    Ok(v) => {
+                        publisher
+                            .publish(events::SystemNotify::VolumeChanged(v))
+                            .await;
+                    }
+                    Err(e) => warn!("Failed to decrease volume: {:?}", e),
+                }
             }
             events::SystemEvent::RadioSetFrequency(freq) => {
                 let tune_status = self
@@ -169,8 +162,14 @@ where
                     .publish(events::SystemNotify::TuneStatus(tune_status))
                     .await;
             }
+            events::SystemEvent::RadioBand(band) => {
+                self.band(band, publisher).await;
+            }
+            events::SystemEvent::RadioPropertyList => {
+                self.property_list(publisher).await;
+            }
             _ => {
-                info!("Event not handled in main loop");
+                info!("Event not handled in main loop: {:?}", event);
             }
         }
     }
