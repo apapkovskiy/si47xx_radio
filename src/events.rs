@@ -16,10 +16,10 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_sync::pubsub::{PubSubChannel, Publisher, Subscriber};
 
-use si473x::{Si47xxRevision, Si47xxTuneStatus};
+use si473x::{RadioBand, Si47xxProperty, Si47xxRevision, Si47xxTuneStatus, Volume};
 
 /// Events representing user actions or commands for the radio system.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SystemEvent {
     /// Turn on FM radio.
     RadioFmOn,
@@ -42,11 +42,19 @@ pub enum SystemEvent {
     /// Decrease volume by one step.
     RadioVolumeDown,
     /// Set volume to a specific value.
-    RadioVolumeSet(u8),
+    RadioVolumeSet(Volume),
+    /// Set Radio band.
+    RadioBand(RadioBand),
+    /// List available bands.
+    RadioListBands,
+    /// Set a radio property by ID and value.
+    RadioPropertySet(u16, u16),
+    /// List all radio properties.
+    RadioPropertyList,
 }
 
 /// Notifications representing status updates or responses from the radio hardware.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SystemNotify {
     /// Current tuning status (frequency, signal, etc).
     TuneStatus(Si47xxTuneStatus),
@@ -63,7 +71,11 @@ pub enum SystemNotify {
     /// Audio output has been unmuted.
     RadioUnmute,
     /// Volume has changed to the given value.
-    VolumeChanged(u8),
+    VolumeChanged(Volume),
+    /// Radio band has been changed to the given value.
+    BandChanged(RadioBand),
+    /// Radio property information (ID and value).
+    RadioPropertyInfo(Si47xxProperty, u16),
 }
 
 pub type NtfPublisher<'a> = Publisher<'a, CriticalSectionRawMutex, SystemNotify, 4, 4, 2>;

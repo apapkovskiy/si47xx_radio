@@ -13,13 +13,15 @@ mod cmd_tune;
 use cmd_tune::TuneCommand;
 mod cmd_volume;
 use cmd_volume::VolumeCommand;
+mod cmd_property;
+use cmd_property::PropertyCommand;
 mod prompt;
 use prompt::PromptStatus;
 
 pub const DEL: u8 = 127; // Delete character
 
 #[derive(Debug, Command)]
-enum BaseCommand {
+enum BaseCommand<'a> {
     Mode {
         #[command(subcommand)]
         command: RadioMode,
@@ -30,7 +32,11 @@ enum BaseCommand {
     },
     Tune {
         #[command(subcommand)]
-        command: TuneCommand,
+        command: TuneCommand<'a>,
+    },
+    Property {
+        #[command(subcommand)]
+        command: PropertyCommand,
     },
     /// Show some status
     Status,
@@ -62,6 +68,18 @@ fn cli_handle_notification(
                 tune_status.frequency, tune_status
             )
             .ok();
+        }
+        SystemNotify::RadioPropertyInfo(id, value) => {
+            write!(writer, "Property ID: {:?}, Value: {}", id, value).ok();
+        }
+        SystemNotify::BandChanged(band) => {
+            prompt_status.set_band(band);
+            write!(writer, "Band changed to {}", band).ok();
+            prompt_status.set_band(band);
+            prompt_status.set_band(band);
+        }
+        SystemNotify::VolumeChanged(volume) => {
+            prompt_status.set_volume(volume);
         }
         _ => {
             write!(writer, "Notification: {:#?}", event).ok();
@@ -134,6 +152,10 @@ pub async fn my_task(mut rx: HalUartRx) {
                     Ok(())
                 }
                 BaseCommand::Tune { command } => {
+                    command.execute(cli.writer());
+                    Ok(())
+                }
+                BaseCommand::Property { command } => {
                     command.execute(cli.writer());
                     Ok(())
                 }

@@ -5,7 +5,7 @@ use embassy_executor::Spawner;
 use embassy_futures::yield_now;
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
-use log::{error, info};
+use log::error;
 use panic_probe as _;
 use rtt_target::rtt_init_print;
 
@@ -61,7 +61,6 @@ async fn run(spawner: Spawner) {
         let _ = OutputPin::set_low(&mut led);
         Timer::after_millis(300).await;
         let event = events::event_receive().await;
-        info!("Received event: {:?}", event);
         match event {
             events::SystemEvent::RadioFmOn => {
                 radio = radio.fm().await.unwrap();
