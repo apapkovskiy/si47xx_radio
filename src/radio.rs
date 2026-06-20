@@ -2,7 +2,7 @@ use crate::events;
 use crate::events::NtfPublisher;
 use crate::settings::Settings;
 use embassy_futures::yield_now;
-use log::{info, warn};
+use log::{error, info, warn};
 use si473x::{RadioBand, Si47xx};
 
 mod mode;
@@ -156,11 +156,23 @@ where
                     .await;
             }
             events::SystemEvent::RadioSeekUp => {
-                let tune_status = self.radio.seek_up().await.expect("Seek up failed");
-                info!("Seeked up: {:?}", tune_status);
-                publisher
-                    .publish(events::SystemNotify::TuneStatus(tune_status))
+                let ret = self
+                    .radio
+                    .seek_up(|ts| {
+                        publisher
+                            .try_publish(events::SystemNotify::TuneStatus(ts))
+                            .unwrap_or_default()
+                    })
                     .await;
+                match ret {
+                    Ok(tune_status) => {
+                        info!("Seek up: {:?}", tune_status);
+                        publisher
+                            .publish(events::SystemNotify::TuneStatus(tune_status))
+                            .await;
+                    }
+                    Err(e) => error!("Seek up failed; error: {:?}", e),
+                }
             }
             events::SystemEvent::RadioBand(band) => {
                 self.band(band, publisher).await;

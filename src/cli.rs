@@ -62,15 +62,14 @@ fn cli_handle_notification(
         }
         SystemNotify::TuneStatus(tune_status) => {
             prompt_status.set_frequency(tune_status.frequency);
-            write!(
-                writer,
-                "Tuned to frequency {} MHz, {:#?}",
-                tune_status.frequency, tune_status
-            )
-            .ok();
         }
         SystemNotify::RadioPropertyInfo(id, value) => {
-            write!(writer, "Property ID: {:?}, Value: {}", id, value).ok();
+            write!(
+                writer,
+                "Property ID: {:?}({}), Value: {}",
+                id, id as u16, value
+            )
+            .ok();
         }
         SystemNotify::BandChanged(band) => {
             prompt_status.set_band(band);
