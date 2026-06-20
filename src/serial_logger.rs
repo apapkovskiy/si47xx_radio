@@ -7,6 +7,7 @@
 //! - writes through the shared UART writer provided by `console::stdout_get()`.
 
 use crate::console;
+use crate::console::console_codes::{CLEAR_LINE, CRLF};
 use crate::console::console_colors::{RED, RESET, WHITE, YELLOW};
 use core::fmt::Write as _;
 use embassy_time::Instant;
@@ -41,7 +42,7 @@ impl log::Log for SerialLogger {
             let level_color = SerialLogger::get_level_color(record.level());
             let _ = write!(
                 console::stdout_get(),
-                "\r{level_color}[{:012}] <{}> {}:{}: {}{RESET}\r\n",
+                "{CLEAR_LINE}\r{level_color}[{:012}] <{}> {}:{}: {}{RESET}{CRLF}",
                 seconds,
                 record.level(),
                 record.file().unwrap_or("unknown"),

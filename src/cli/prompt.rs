@@ -35,6 +35,7 @@ impl<'d> PromptStatus<'d> {
     }
 
     pub fn get_prompt(&mut self) -> &'d str {
+        use crate::console::console_codes::*;
         use crate::console::console_colors::*;
         self.prompt.get_mut().clear();
         let precision = match self.mode {
@@ -43,7 +44,7 @@ impl<'d> PromptStatus<'d> {
         };
         let _ = write!(
             self.prompt.get_mut(),
-            "{BOLD_GREEN}radio-cli ({BOLD_BLUE}{:?} {BOLD_YELLOW}{precision} MHz, {}, SNR: {} V: {}{BOLD_GREEN})>{RESET} ",
+            "{CURSOR_OFF}{BOLD_GREEN}radio-cli ({BOLD_BLUE}{:?} {BOLD_YELLOW}{precision} MHz, {}, SNR: {} V: {}{BOLD_GREEN})>{RESET}{CURSOR_ON} ",
             self.mode,
             self.band,
             self.tune_status.snr,
