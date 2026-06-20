@@ -45,6 +45,16 @@ pub mod console_colors {
     pub const BOLD_WHITE: Arguments = format_args!("\x1B[1;37m");
 }
 
+pub mod console_codes {
+    #![allow(dead_code)]
+    //! ANSI color escape codes for optional terminal styling.
+    use core::fmt::Arguments;
+    pub const CLEAR_LINE: Arguments = format_args!("\x1B[2K");
+    pub const CRLF: Arguments = format_args!("\r\n");
+    pub const CURSOR_OFF: Arguments = format_args!("\x1B[?25l");
+    pub const CURSOR_ON: Arguments = format_args!("\x1b[?25h");
+}
+
 pub fn stdout_get() -> StdOut {
     StdOut
 }
