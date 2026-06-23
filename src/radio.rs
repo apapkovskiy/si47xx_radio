@@ -3,7 +3,7 @@ use crate::events::NtfPublisher;
 use crate::settings::Settings;
 use embassy_futures::yield_now;
 use log::{error, info, warn};
-use si473x::{RadioBand, Si47xx};
+use si473x::{RadioBand, Si47xx, Si47xxProperty};
 
 mod mode;
 pub use mode::RadioMode;
@@ -50,6 +50,14 @@ where
                 warn!("Failed to set band, error: {:?}", e);
             }
         }
+    }
+
+    pub async fn property_set(&mut self, property: Si47xxProperty, value: u16) {
+        let _ = self
+            .radio
+            .property_set(property, value)
+            .await
+            .inspect_err(|e| warn!("Failed to set property: {:?}", e));
     }
 
     pub async fn property_list(&mut self, publisher: &NtfPublisher<'_>) {
@@ -179,6 +187,9 @@ where
             }
             events::SystemEvent::RadioPropertyList => {
                 self.property_list(publisher).await;
+            }
+            events::SystemEvent::RadioPropertySet(property, value) => {
+                self.property_set(property, value).await;
             }
             _ => {
                 info!("Event not handled in main loop: {:?}", event);
