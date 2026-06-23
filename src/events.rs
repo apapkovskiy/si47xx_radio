@@ -48,7 +48,7 @@ pub enum SystemEvent {
     /// List available bands.
     RadioListBands,
     /// Set a radio property by ID and value.
-    RadioPropertySet(u16, u16),
+    RadioPropertySet(Si47xxProperty, u16),
     /// List all radio properties.
     RadioPropertyList,
 }
