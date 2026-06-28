@@ -3,7 +3,7 @@ use crate::events::SystemEvent;
 use embedded_cli::Command;
 use si473x::Volume;
 
-#[derive(Debug, Command)]
+#[derive(Debug, Command, Clone, Copy)]
 pub(crate) enum VolumeCommand {
     /// Increase volume
     Up,
@@ -17,21 +17,21 @@ pub(crate) enum VolumeCommand {
 }
 
 impl VolumeCommand {
-    pub fn execute<T: core::fmt::Write>(self, writer: &mut T) {
+    pub async fn execute<T: core::fmt::Write>(self, writer: &mut T) {
         match self {
             VolumeCommand::Up => {
                 let _ = writer.write_str("Volume increased");
-                events::event_try_send(SystemEvent::RadioVolumeUp);
+                events::event_send(SystemEvent::RadioVolumeUp).await;
             }
             VolumeCommand::Down => {
                 let _ = writer.write_str("Volume decreased");
-                events::event_try_send(SystemEvent::RadioVolumeDown);
+                events::event_send(SystemEvent::RadioVolumeDown).await;
             }
             VolumeCommand::Set { level } => {
                 let volume = Volume::try_from(level);
                 if let Ok(volume) = volume {
                     let _ = writer.write_fmt(format_args!("Volume set to {}", volume.get()));
-                    events::event_try_send(SystemEvent::RadioVolumeSet(volume));
+                    events::event_send(SystemEvent::RadioVolumeSet(volume)).await;
                 } else {
                     let _ = writer.write_fmt(format_args!(
                         "Invalid volume level: {}. Must be between 0 and 100.",
