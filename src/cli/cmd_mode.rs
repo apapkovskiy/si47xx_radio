@@ -2,7 +2,7 @@ use crate::events;
 use crate::events::SystemEvent;
 use embedded_cli::Command;
 
-#[derive(Debug, Command)]
+#[derive(Debug, Command, Clone, Copy)]
 pub(crate) enum RadioMode {
     /// FM Mode
     FM,
@@ -13,11 +13,12 @@ pub(crate) enum RadioMode {
 }
 
 impl RadioMode {
-    pub fn execute(self) {
+    pub async fn execute(self) {
         match self {
-            RadioMode::FM => events::event_try_send(SystemEvent::RadioFmOn),
-            RadioMode::AM => events::event_try_send(SystemEvent::RadioAmOn),
-            RadioMode::Off => events::event_try_send(SystemEvent::RadioOff),
+            RadioMode::FM => events::event_send(SystemEvent::RadioFmOn),
+            RadioMode::AM => events::event_send(SystemEvent::RadioAmOn),
+            RadioMode::Off => events::event_send(SystemEvent::RadioOff),
         }
+        .await
     }
 }

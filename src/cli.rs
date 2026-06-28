@@ -2,44 +2,43 @@ use crate::boards::hal::*;
 use crate::console;
 use crate::events;
 use crate::events::SystemNotify;
-use core::fmt::{Debug, Write};
+use core::fmt::{Arguments, Write};
 use embassy_futures::select::{Either, select};
-use embedded_cli::cli::CliBuilder;
-use embedded_cli::{Command, codes};
+use embedded_cli::buffer::Buffer;
+use embedded_cli::cli::{Cli, CliBuilder};
 
+mod cli_base;
+use cli_base::{BaseCommand, process_byte};
+mod cmd_config;
 mod cmd_mode;
 use cmd_mode::RadioMode;
-mod cmd_tune;
-use cmd_tune::TuneCommand;
-mod cmd_volume;
-use cmd_volume::VolumeCommand;
 mod cmd_property;
-use cmd_property::PropertyCommand;
+mod cmd_tune;
+mod cmd_volume;
 mod prompt;
 use prompt::PromptStatus;
 
-pub const DEL: u8 = 127; // Delete character
+const CLI_READ_BUFFER_SIZE: usize = 32;
 
-#[derive(Debug, Command)]
-enum BaseCommand<'a> {
-    Mode {
-        #[command(subcommand)]
-        command: RadioMode,
-    },
-    Volume {
-        #[command(subcommand)]
-        command: VolumeCommand,
-    },
-    Tune {
-        #[command(subcommand)]
-        command: TuneCommand<'a>,
-    },
-    Property {
-        #[command(subcommand)]
-        command: PropertyCommand,
-    },
-    /// Show some status
-    Status,
+struct CliApi<'a, W: embedded_io::Write<Error = E>, E: embedded_io::Error, C: Buffer, H: Buffer>(
+    &'a mut Cli<W, E, C, H>,
+);
+
+impl<'a, W: embedded_io::Write<Error = E>, E: embedded_io::Error, C: Buffer, H: Buffer> Write
+    for CliApi<'a, W, E, C, H>
+{
+    fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
+        let _ = self.0.write(|writer| writer.write_str(s));
+        Ok(())
+    }
+
+    fn write_fmt(&mut self, args: Arguments<'_>) -> Result<(), core::fmt::Error> {
+        let _ = self.0.write(|writer| {
+            writer.write_fmt(args).ok();
+            Ok(())
+        });
+        Ok(())
+    }
 }
 
 fn cli_handle_notification(
@@ -86,6 +85,29 @@ fn cli_handle_notification(
     }
 }
 
+async fn handle_command(command: &BaseCommand, writer: &mut impl Write) {
+    match command {
+        BaseCommand::Status => {
+            let _ = writer.write_str("System status: All systems operational");
+        }
+        BaseCommand::Mode { command } => {
+            command.execute().await;
+        }
+        BaseCommand::Volume { command } => {
+            command.execute(writer).await;
+        }
+        BaseCommand::Tune { command } => {
+            command.execute(writer).await;
+        }
+        BaseCommand::Property { command } => {
+            command.execute(writer).await;
+        }
+        BaseCommand::Config { command } => {
+            command.execute(writer).await;
+        }
+    }
+}
+
 #[embassy_executor::task]
 pub async fn my_task(mut rx: HalUartRx) {
     let (command_buffer, history_buffer) = unsafe {
@@ -107,10 +129,11 @@ pub async fn my_task(mut rx: HalUartRx) {
     let mut notification_subscriber = events::notify_subscriber().unwrap();
 
     loop {
-        let buffer = &mut [0u8; 1];
+        let mut buffer = [0u8; CLI_READ_BUFFER_SIZE];
 
         loop {
-            let char = rx.read(buffer);
+            buffer.fill(0);
+            let char = rx.read(&mut buffer);
             match select(char, notification_subscriber.next_message_pure()).await {
                 Either::First(_) => break,
                 Either::Second(event) => {
@@ -124,41 +147,15 @@ pub async fn my_task(mut rx: HalUartRx) {
             }
         }
 
-        if buffer[0] == DEL {
-            // Currently CLI does not handle DEL
-            buffer[0] = codes::BACKSPACE; // To overcome map DEL to BACKSPACE
+        let mut cmd = None::<BaseCommand>;
+        for byte in buffer {
+            if byte == 0 {
+                break;
+            }
+            process_byte(&mut cli, byte, &mut cmd);
+            if let Some(command) = cmd {
+                handle_command(&command, &mut CliApi(&mut cli)).await;
+            }
         }
-
-        // Process incoming byte
-        // Command type is specified for autocompletion and help
-        // Processor accepts closure where we can process parsed command
-        // we can use different command and processor with each call
-        let _ = cli.process_byte::<BaseCommand, _>(
-            buffer[0],
-            &mut BaseCommand::processor(|cli, command| match command {
-                BaseCommand::Status => {
-                    let _ = cli
-                        .writer()
-                        .write_str("System status: All systems operational");
-                    Ok(())
-                }
-                BaseCommand::Mode { command } => {
-                    command.execute();
-                    Ok(())
-                }
-                BaseCommand::Volume { command } => {
-                    command.execute(cli.writer());
-                    Ok(())
-                }
-                BaseCommand::Tune { command } => {
-                    command.execute(cli.writer());
-                    Ok(())
-                }
-                BaseCommand::Property { command } => {
-                    command.execute(cli.writer());
-                    Ok(())
-                }
-            }),
-        );
     }
 }

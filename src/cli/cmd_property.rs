@@ -3,7 +3,7 @@ use crate::events::SystemEvent;
 use embedded_cli::Command;
 use si473x::Si47xxProperty;
 
-#[derive(Debug, Command)]
+#[derive(Debug, Command, Clone, Copy)]
 pub(crate) enum PropertyCommand {
     /// Set a radio property by ID and value.
     Set {
@@ -17,7 +17,7 @@ pub(crate) enum PropertyCommand {
 }
 
 impl PropertyCommand {
-    pub fn execute<T: core::fmt::Write>(self, writer: &mut T) {
+    pub async fn execute<T: core::fmt::Write>(self, writer: &mut T) {
         match self {
             PropertyCommand::Set { id, value } => {
                 let property = Si47xxProperty::try_from(id);
@@ -26,7 +26,7 @@ impl PropertyCommand {
                         writer
                             .write_fmt(format_args!("Setting property {:?} to {}", property, value))
                             .ok();
-                        events::event_try_send(SystemEvent::RadioPropertySet(property, value));
+                        events::event_send(SystemEvent::RadioPropertySet(property, value)).await;
                     }
                     Err(e) => {
                         writer
@@ -36,7 +36,7 @@ impl PropertyCommand {
                 }
             }
             PropertyCommand::List => {
-                events::event_try_send(SystemEvent::RadioPropertyList);
+                events::event_send(SystemEvent::RadioPropertyList).await;
             }
         }
     }
