@@ -15,7 +15,7 @@ impl ConfigCommand {
                     writer
                         .write_fmt(format_args!(
                             "{}: {}",
-                            option.get_key(),
+                            option.get_description(),
                             option.get().await.as_str()
                         ))
                         .ok();
