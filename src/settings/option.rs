@@ -1,15 +1,39 @@
 use core::str::FromStr;
 
+use core::fmt::Write;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::rwlock::RwLock;
-
 use heapless::String;
 
 pub trait OptionValidator<const N: usize>: Sync {
     fn validate(&self, raw: &String<N>) -> String<N>;
 }
 
-pub struct OptionString<const N: usize> {
+pub trait OptionToString<const N: usize = 64> {
+    fn to_string(&self) -> String<N>;
+}
+
+impl<const N: usize> OptionToString<N> for u8 {
+    fn to_string(&self) -> String<N> {
+        String::<N>::try_from(*self).unwrap_or_default()
+    }
+}
+
+impl<const N: usize> OptionToString<N> for u16 {
+    fn to_string(&self) -> String<N> {
+        String::<N>::try_from(*self).unwrap_or_default()
+    }
+}
+
+impl<const N: usize> OptionToString<N> for f32 {
+    fn to_string(&self) -> String<N> {
+        let mut new = String::<N>::new();
+        write!(&mut new, "{}", self).map_err(|_| ()).ok();
+        new
+    }
+}
+
+pub struct OptionString<const N: usize = 64> {
     key: &'static str,
     pub(crate) str: RwLock<CriticalSectionRawMutex, String<N>>,
     validator: &'static dyn OptionValidator<N>,
@@ -23,19 +47,17 @@ pub struct ConfigOption<T, const N: usize = 64> {
 
 impl<T, const N: usize> OptionValidator<N> for ConfigOption<T, N>
 where
-    T: Sync + AsRef<str> + FromStr + Copy + Clone,
+    T: Sync + OptionToString<N> + FromStr + Copy + Clone,
 {
     fn validate(&self, raw: &String<N>) -> String<N> {
         let value: T = raw.parse().unwrap_or(self.default);
-        let mut str = String::<N>::new();
-        let _ = str.push_str(value.as_ref());
-        str
+        String::<N>::try_from(value.to_string()).unwrap_or_default()
     }
 }
 
 impl<T, const N: usize> ConfigOption<T, N>
 where
-    T: Sync + AsRef<str> + FromStr + Copy + Clone,
+    T: Sync + OptionToString<N> + FromStr + Copy + Clone,
 {
     pub const fn new(
         key: &'static str,
@@ -50,7 +72,7 @@ where
     }
 
     pub async fn set(&self, value: &T) {
-        self.option.set(value.as_ref()).await;
+        self.option.set(value.to_string().as_str()).await;
     }
 
     pub async fn get(&self) -> T {

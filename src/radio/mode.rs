@@ -1,15 +1,18 @@
-use crate::settings::{OPTIONS, option::ConfigOption, option::OptionString};
+use crate::settings::{
+    OPTIONS, option::ConfigOption, option::OptionString, option::OptionToString,
+};
 use core::str::FromStr;
+use heapless::String;
 use linkme::distributed_slice;
 
-static CONFIG_RADIO_MODE: ConfigOption<RadioMode, 64> = ConfigOption::new(
+static CONFIG_RADIO_MODE: ConfigOption<RadioMode> = ConfigOption::new(
     "radio_mode",
     RadioMode::AM,
     &CONFIG_RADIO_MODE,
     "Radio mode (FM, AM, Off)",
 );
 #[distributed_slice(OPTIONS)]
-static CONFIG_RADIO_MODE_STR: &'static OptionString<64> = &CONFIG_RADIO_MODE.option;
+static CONFIG_RADIO_MODE_STR: &'static OptionString = &CONFIG_RADIO_MODE.option;
 
 #[derive(Debug, Copy, Clone)]
 pub enum RadioMode {
@@ -59,5 +62,11 @@ impl From<&RadioMode> for &'static str {
 impl AsRef<str> for RadioMode {
     fn as_ref(&self) -> &'static str {
         self.into()
+    }
+}
+
+impl<const N: usize> OptionToString<N> for RadioMode {
+    fn to_string(&self) -> String<N> {
+        String::<N>::try_from(self.as_ref()).unwrap_or_default()
     }
 }
