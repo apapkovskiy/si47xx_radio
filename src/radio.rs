@@ -5,6 +5,8 @@ use embassy_futures::yield_now;
 use log::{error, info, warn};
 use si473x::{RadioBand, Si47xx, Si47xxProperty};
 
+mod config;
+pub use config::RadioConfig;
 mod mode;
 pub use mode::RadioMode;
 
@@ -14,25 +16,43 @@ where
 {
     pub mode: RadioMode,
     pub radio: T,
+    pub config: RadioConfig,
 }
 
 impl<T> Radio<T>
 where
-    T: Si47xx<Device = T>,
+    T: Si47xx,
 {
     pub fn new(radio: T) -> Self {
         Self {
             mode: RadioMode::Off,
             radio,
+            config: RadioConfig,
         }
     }
 
-    pub async fn am(mut self) -> Result<Self, ()> {
+    pub async fn am(&mut self, publisher: &NtfPublisher<'_>) {
         self.mode = RadioMode::AM;
         self.mode.save().await;
-        self.radio = self.radio.am().await.expect("Failed to switch to AM mode");
+        self.radio.am().await.expect("Failed to switch to AM mode");
         Settings::save().await.expect("Failed to save settings");
-        Ok(self)
+        publisher.publish(events::SystemNotify::RadioAmOn).await;
+        self.band(self.config.config_fm_band_get().await, publisher)
+            .await;
+        self.property_set(
+            Si47xxProperty::AmSeekTuneRssiThreshold,
+            self.config.config_am_tune_rssi_threshold_get().await,
+        )
+        .await;
+        self.property_set(
+            Si47xxProperty::AmSeekTuneSnrThreshold,
+            self.config.config_am_tune_snr_threshold_get().await,
+        )
+        .await;
+        self.radio
+            .tune_frequency(self.config.config_fm_freq_get().await)
+            .await
+            .expect("Failed to tune frequency");
     }
 
     pub async fn band(&mut self, band: RadioBand, publisher: &NtfPublisher<'_>) {
@@ -70,41 +90,55 @@ where
             .inspect_err(|e| warn!("Failed to list properties: {:?}", e));
     }
 
-    pub async fn fm(mut self) -> Result<Self, ()> {
+    pub async fn fm(&mut self, publisher: &NtfPublisher<'_>) {
         self.mode = RadioMode::FM;
         self.mode.save().await;
-        self.radio = self.radio.fm().await.expect("Failed to switch to FM mode");
+        self.radio.fm().await.expect("Failed to switch to FM mode");
         Settings::save().await.expect("Failed to save settings");
-        Ok(self)
+        publisher.publish(events::SystemNotify::RadioFmOn).await;
+        self.band(self.config.config_fm_band_get().await, publisher)
+            .await;
+        self.property_set(
+            Si47xxProperty::FmSeekTuneRssiThreshold,
+            self.config.config_fm_tune_rssi_threshold_get().await,
+        )
+        .await;
+        self.property_set(
+            Si47xxProperty::FmSeekTuneSnrThreshold,
+            self.config.config_fm_tune_snr_threshold_get().await,
+        )
+        .await;
+        self.radio
+            .tune_frequency(self.config.config_fm_freq_get().await)
+            .await
+            .expect("Failed to tune frequency");
     }
 
-    pub async fn off(mut self) -> Result<Self, ()> {
+    pub async fn off(&mut self, publisher: &NtfPublisher<'_>) {
         self.mode = RadioMode::Off;
+        self.radio.power_down().await.expect("Radio off failed");
         self.mode.save().await;
         Settings::save().await.expect("Failed to save settings");
-        Ok(self)
+        publisher.publish(events::SystemNotify::RadioOff).await;
     }
 
-    pub async fn init(mut self, publisher: &NtfPublisher<'_>) -> Result<Self, ()> {
-        self.radio = self.radio.reset().await;
+    pub async fn init(&mut self, publisher: &NtfPublisher<'_>) {
+        self.radio.reset().await;
         self.mode = RadioMode::get().await;
         warn!("Initializing radio in {:?} mode", self.mode);
-        self.radio = match self.mode {
+        match self.mode {
             RadioMode::FM => {
-                let radio = self.radio.fm().await.expect("Failed to init to FM mode");
+                self.radio.fm().await.expect("Failed to init to FM mode");
                 publisher.publish(events::SystemNotify::RadioFmOn).await;
                 yield_now().await;
-                radio
             }
             RadioMode::AM => {
-                let radio = self.radio.am().await.expect("Failed to init to AM mode");
+                self.radio.am().await.expect("Failed to init to AM mode");
                 publisher.publish(events::SystemNotify::RadioAmOn).await;
                 yield_now().await;
-                radio
             }
             RadioMode::Off => {
                 warn!("Radio initialized in Off mode!");
-                return Ok(self); // No initialization needed for Off mode
             }
         };
         let revision = self
@@ -126,11 +160,19 @@ where
             .await;
         self.radio.sound_on().await.expect("Failed to unmute sound");
         warn!("Radio initialized!");
-        Ok(self)
     }
 
     pub async fn handle_event(&mut self, event: events::SystemEvent, publisher: &NtfPublisher<'_>) {
         match event {
+            events::SystemEvent::RadioFmOn => {
+                self.fm(publisher).await;
+            }
+            events::SystemEvent::RadioAmOn => {
+                self.am(publisher).await;
+            }
+            events::SystemEvent::RadioOff => {
+                self.off(publisher).await;
+            }
             events::SystemEvent::RadioVolumeUp => {
                 let volume = self.radio.volume_up().await;
                 match volume {

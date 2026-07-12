@@ -20,7 +20,7 @@ embedded-hal-async = { version = "1.0" }
 static_cell = "2"
 panic-probe = { version = "1.0.0", features = ["print-rtt"] }
 rtt-target = "0.5.0"
-si473x = { git = "https://github.com/apapkovskiy/si473x-rs.git", rev = "008cc319a91dee948be11479360576f35f5697c5" }
+si473x = { git = "https://github.com/apapkovskiy/si473x-rs.git", rev = "b6694871cedf5f6dd5f324d8add538f66d2601c1" }
 # si473x = { path  = "../si473x-rs" }
 heapless = "0.9.2"
 log = "0.4.29"

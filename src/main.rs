@@ -15,7 +15,7 @@ pub mod console;
 use crate::boards::hal::*;
 pub mod events;
 mod serial_logger;
-use si473x::{Si47xxDevice, Si47xxRadio};
+use si473x::Si47xxRadio;
 mod settings;
 use settings::Settings;
 mod radio;
@@ -48,12 +48,12 @@ async fn run(spawner: Spawner) {
     let mut led = hal_led_create();
     let twi = hal_twi_create();
     let reset_pin = hal_radio_reset_create();
-    let radio_dev: Si47xxDevice<_, _> = Si47xxDevice::new(twi, reset_pin);
+    let radio_dev: Si47xxRadio<_, _> = Si47xxRadio::new(twi, reset_pin);
     let _ = spawner.spawn(cli::my_task(rx));
     yield_now().await;
     let notification_publisher = events::notify_publisher().unwrap();
-    let mut radio = Radio::new(Si47xxRadio::Off(radio_dev));
-    radio = radio.init(&notification_publisher).await.unwrap();
+    let mut radio = Radio::new(radio_dev);
+    radio.init(&notification_publisher).await;
 
     loop {
         let _ = OutputPin::set_high(&mut led);
@@ -61,20 +61,7 @@ async fn run(spawner: Spawner) {
         let _ = OutputPin::set_low(&mut led);
         Timer::after_millis(300).await;
         let event = events::event_receive().await;
-        match event {
-            events::SystemEvent::RadioFmOn => {
-                radio = radio.fm().await.unwrap();
-            }
-            events::SystemEvent::RadioAmOn => {
-                radio = radio.am().await.unwrap();
-            }
-            events::SystemEvent::RadioOff => {
-                radio = radio.off().await.unwrap();
-            }
-            _ => {
-                radio.handle_event(event, &notification_publisher).await;
-            }
-        }
+        radio.handle_event(event, &notification_publisher).await;
     }
 }
 

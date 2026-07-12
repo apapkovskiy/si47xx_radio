@@ -177,7 +177,9 @@ impl Settings {
     pub async fn save() -> Result<(), SettingsError> {
         let db = DB.get().await;
         let mut wtx = db.write_transaction().await;
-        for option in OPTIONS {
+        let mut options: Vec<_, MAX_STRING_LENGTH> = OPTIONS.iter().copied().collect();
+        options.sort_unstable_by_key(|o| o.get_key());
+        for option in options {
             let val = option.str.read().await;
             wtx.write(option.get_key().as_bytes(), val.as_bytes())
                 .await
