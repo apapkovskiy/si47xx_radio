@@ -37,7 +37,7 @@ where
         self.radio.am().await.expect("Failed to switch to AM mode");
         Settings::save().await.expect("Failed to save settings");
         publisher.publish(events::SystemNotify::RadioAmOn).await;
-        self.band(self.config.config_fm_band_get().await, publisher)
+        self.band(self.config.config_am_band_get().await, publisher)
             .await;
         self.property_set(
             Si47xxProperty::AmSeekTuneRssiThreshold,
@@ -49,10 +49,12 @@ where
             self.config.config_am_tune_snr_threshold_get().await,
         )
         .await;
+        let freq = self.config.config_am_freq_get().await;
         self.radio
-            .tune_frequency(self.config.config_fm_freq_get().await)
+            .tune_frequency(freq)
             .await
-            .expect("Failed to tune frequency");
+            .inspect_err(|e| warn!("Failed to tune frequency {}: {:?}", freq, e))
+            .ok();
     }
 
     pub async fn band(&mut self, band: RadioBand, publisher: &NtfPublisher<'_>) {
@@ -67,7 +69,7 @@ where
                         .await;
                     return;
                 };
-                warn!("Failed to set band, error: {:?}", e);
+                warn!("Failed to set band {}: {:?}", band, e);
             }
         }
     }
@@ -108,10 +110,12 @@ where
             self.config.config_fm_tune_snr_threshold_get().await,
         )
         .await;
+        let freq = self.config.config_fm_freq_get().await;
         self.radio
-            .tune_frequency(self.config.config_fm_freq_get().await)
+            .tune_frequency(freq)
             .await
-            .expect("Failed to tune frequency");
+            .inspect_err(|e| warn!("Failed to tune frequency {}: {:?}", freq, e))
+            .ok();
     }
 
     pub async fn off(&mut self, publisher: &NtfPublisher<'_>) {
@@ -139,6 +143,8 @@ where
             }
             RadioMode::Off => {
                 warn!("Radio initialized in Off mode!");
+                publisher.publish(events::SystemNotify::RadioOff).await;
+                return;
             }
         };
         let revision = self
@@ -159,7 +165,6 @@ where
             .publish(events::SystemNotify::TuneStatus(tune_status))
             .await;
         self.radio.sound_on().await.expect("Failed to unmute sound");
-        warn!("Radio initialized!");
     }
 
     pub async fn handle_event(&mut self, event: events::SystemEvent, publisher: &NtfPublisher<'_>) {
