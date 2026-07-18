@@ -64,6 +64,10 @@ impl HostUartRx {
         use async_std::io::prelude::ReadExt;
         self.0.read(buf).await.map_err(|_| Error::FakeError)
     }
+    pub async fn read_until_idle(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
+        use async_std::io::prelude::ReadExt;
+        self.0.read(buf).await.map_err(|_| Error::FakeError)
+    }
 }
 
 impl Default for HostUartRx {

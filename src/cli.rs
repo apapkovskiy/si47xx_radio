@@ -133,7 +133,7 @@ pub async fn my_task(mut rx: HalUartRx) {
 
         loop {
             buffer.fill(0);
-            let char = rx.read(&mut buffer);
+            let char = rx.read_until_idle(&mut buffer);
             match select(char, notification_subscriber.next_message_pure()).await {
                 Either::First(_) => break,
                 Either::Second(event) => {
@@ -146,7 +146,6 @@ pub async fn my_task(mut rx: HalUartRx) {
                 }
             }
         }
-
         let mut cmd = None::<BaseCommand>;
         for byte in buffer {
             if byte == 0 {
