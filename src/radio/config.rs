@@ -34,7 +34,7 @@ static CONFIG_AM_TUNE_SNR_THRESHOLD_STR: &'static OptionString =
 
 static CONFIG_AM_TUNE_RSSI_THRESHOLD: ConfigOption<u16> = ConfigOption::new(
     "am_tune_rssi_threshold",
-    20,
+    13,
     &CONFIG_AM_TUNE_RSSI_THRESHOLD,
     "AM tune RSSI threshold, dBµV (0–63)",
 );
