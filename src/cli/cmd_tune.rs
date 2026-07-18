@@ -62,7 +62,7 @@ impl TuneCommand {
             TuneCommand::List => {
                 let _ = writer.write_str("Available bands: FM, AM");
                 RadioBand::for_each(|band| {
-                    write!(writer, "\n- {}", band).ok();
+                    write!(writer, "- {}", band).ok();
                 });
             }
             TuneCommand::Band { band } => {
