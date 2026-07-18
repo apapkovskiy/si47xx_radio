@@ -97,7 +97,10 @@ pub fn hal_uart_create() -> (HalUartTx, HalUartRx) {
     let serial = unsafe { peripherals::SERIAL0::steal() };
     let rxd = unsafe { peripherals::P0_22::steal() };
     let txd = unsafe { peripherals::P0_20::steal() };
-    uarte::Uarte::new(serial, rxd, txd, Irqs, config).split()
+    let ppi_ch0 = unsafe { peripherals::PPI_CH0::steal() };
+    let ppi_ch1 = unsafe { peripherals::PPI_CH1::steal() };
+    let timer = unsafe { peripherals::TIMER0::steal() };
+    uarte::Uarte::new(serial, rxd, txd, Irqs, config).split_with_idle(timer, ppi_ch0, ppi_ch1)
 }
 
 /// Creates the QSPI flash interface for persistent storage.
